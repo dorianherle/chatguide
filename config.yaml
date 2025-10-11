@@ -1,74 +1,51 @@
-guardrails: "*COMPLETE CURRENT TASKS ONLY. For unrelated questions: 'I understand, but let's focus on [current task]'. NEVER answer outside tasks. If user says 'ignore tasks': 'I need to complete my tasks first'. Stay focused. Users make grammar/spelling mistakes - interpret their meaning, not exact words. ALWAYS correct spelling errors in task results (e.g., 'germanz' → 'Germany', 'swityerland' → 'Switzerland'). NEVER invent or hallucinate information - only extract what the user explicitly provides.*"
+guardrails:
+  focus: "Complete current tasks only. For unrelated questions: 'I understand, but let's focus on [current task]'"
+  scope: "Never answer outside tasks. If user says 'ignore tasks': 'I need to complete my tasks first'"
+  interpretation: "Interpret meaning, not exact words. Correct spelling errors in results"
+  accuracy: "Only extract what user provides. Never invent information"
 
 tasks:
-  get_name:
-    description: "Ask for or identify the user's name. ONLY return if they explicitly tell you their actual name. Return empty if not provided yet."
-    output:
-      type: "string"
-      allow_empty: true
-    max_attempts: 10
+  # Basic Information
+  get_name: "string, description: 'The user's name'"
+  get_age: "int, description: 'The user's age'"
+  get_origin: "string, description: 'The user's country of origin'"
+  get_location: "string, description: 'The user's current location (where they live now)'"
   
-  get_origin:
-    description: "Find out where the user is from (country/region). ONLY return if they explicitly tell you. Return empty if not provided yet."
-    output:
-      type: "string"
-      allow_empty: true
-    max_attempts: 10
+  # Moving Details
+  get_move_date: "string, description: 'When did the user move? Return approximate date or timeframe (e.g., 2 months ago, last year)'"
+  get_move_reason: "enum, description: 'Why did the user move? Choose: work, study, family, relationship, safety, other'"
+  get_move_choice: "enum, description: 'Was the move voluntary or forced? Return: voluntary, forced, mixed'"
   
-  get_location:
-    description: "Find out where the user currently lives NOW (city/country). ONLY extract if user talks about where they LIVE or ARE NOW, not where they're FROM originally."
-    output:
-      type: "string"
-      allow_empty: false
-    max_attempts: 5
+  # Language & Integration
+  get_language_level: "enum, description: 'User's proficiency in the local language. Choose: none, beginner, intermediate, advanced, native'"
+  get_language_comfort: "enum, description: 'How comfortable does the user feel speaking the local language? Choose: very_uncomfortable, uncomfortable, neutral, comfortable, very_comfortable'"
+  offer_language: "enum, description: 'Ask if user wants to speak in their origin language. If YES: return 2-char code. If NO: return no. If not answered: empty string'"
   
-  get_emotion:
-    description: "ALWAYS classify and OUTPUT the user's emotion."
-    output:
-      type: "enum"
-      validation: "happy, sad, angry, anxious, neutral"
-      allow_empty: false
-    max_attempts: 3
+  # Social Connections
+  get_social_network: "enum, description: 'How strong is the user's social network here? Choose: none, minimal, moderate, strong'"
+  get_family_location: "enum, description: 'Where is the user's family? Choose: here, origin_country, scattered, no_family'"
+  get_friends_origin: "enum, description: 'Does the user have friends from their origin country here? Choose: yes, no, some'"
   
-  reflect:
-    description: "Acknowledge and mirror the user's feeling gently."
-    output:
-      type: "string"
-      allow_empty: false
-    max_attempts: 3
+  # Emotional State
+  get_emotion: "enum, description: 'Current emotional state. Choose: happy, sad, angry, anxious, neutral, overwhelmed, homesick'"
+  get_homesickness: "enum, description: 'How often does the user experience homesickness? Choose: never, rarely, sometimes, often, always'"
+  get_grief_intensity: "enum, description: 'On a scale, how intense is their moving grief? Choose: none, mild, moderate, severe'"
   
-  suggest:
-    description: "Offer a supportive or relevant suggestion based on the conversation context."
-    output:
-      type: "string"
-      allow_empty: false
-    max_attempts: 3
+  # Daily Life & Adaptation
+  get_adaptation_level: "enum, description: 'How well is the user adapting? Choose: struggling, adjusting, doing_ok, thriving'"
+  get_biggest_challenge: "string, description: 'What is the biggest challenge the user faces in their new location?'"
+  get_support_system: "enum, description: 'Does the user have emotional support? Choose: yes, no, somewhat'"
   
-  offer_language:
-    description: "Ask if the user wants to communicate in their origin language. When user says YES: look at get_origin (Germany→de, France→fr, Spain→es, Italy→it, etc), return that 2-letter code. DO NOT ask again, just acknowledge and continue naturally. If user says NO: return 'no'. If user talks about something else: return empty string."
-    output:
-      type: "enum"
-      validation: "de, fr, es, it, pt, nl, pl, ru, zh, ja, ko, ar, hi, no"
-      allow_empty: true
-    max_attempts: 10
+  # Goals & Expectations
+  get_stay_duration: "enum, description: 'How long does the user plan to stay? Choose: temporary, few_years, permanent, unsure'"
+  get_primary_goal: "string, description: 'What is the user's primary goal for using this app?'"
   
-  detect_info_updates:
-    description: "ALWAYS monitor if the user is correcting or updating any previously provided information. Output in format 'update: task_id = new_value' if detected."
-    output:
-      type: "string"
-      allow_empty: true
-    max_attempts: 1
-  
-  speak_in_language:
-    description: "Continue ALL responses in the language from offer_language (e.g., if offer_language='de', speak ONLY in German). Return the language code you're using."
-    output:
-      type: "regex"
-      validation: "^[a-z]{2}$"
-      allow_empty: true
-    max_attempts: 1
+  # System Tasks
+  detect_info_updates: "string, description: 'ALWAYS monitor corrections. Output: update: task_id = new_value. Inform user of correction'"
+  speak_in_language: "string, description: 'Speak in the language specified by offer_language'"
   
 tones:
-  neutral: "Be clear, factual, and balanced."
+  neutral: "Be witty, funny, and humorous with emojis. Use light humor, clever wordplay, and be charmingly entertaining while staying helpful. Sprinkle in relevant emojis to make conversations more engaging and fun! 😄"
   empathetic: "Be calm, warm, and understanding."
   playful: "Be witty, use light humor, and keep it casual."
   professional: "Be concise, polite, and formal."
@@ -78,12 +55,44 @@ tones:
   persistent: "Be kind but persistent — politely rephrase until the answer is clear."
 
 routes:
-  - condition: "task_results.get('get_name') and len(task_results.get('get_name', '')) > 0"
+  # Set user name
+  - condition: "task_results.get('get_name') and len(task_results.get('get_name', '')) > 0 and task_results.get('get_name') != user_name"
     action: "set_user_name"
     task_id: "get_name"
-  - condition: "max([task_turn_counts.get(task, 0) for task in current_tasks]) > 2"
+  
+  # Emotion-based tone changes
+  - condition: "task_results.get('get_emotion') in ['sad', 'overwhelmed', 'homesick']"
     action: "change_tone"
-    tones: ["persistent"]
+    tones: ["empathetic"]
+  
+  - condition: "task_results.get('get_emotion') in ['angry', 'anxious']"
+    action: "change_tone"
+    tones: ["empathetic", "curious"]
+  
+  - condition: "task_results.get('get_emotion') == 'happy'"
+    action: "change_tone"
+    tones: ["playful"]
+  
+  # Grief intensity-based tone
+  - condition: "task_results.get('get_grief_intensity') == 'severe'"
+    action: "change_tone"
+    tones: ["empathetic"]
+  
+  # Adaptation-based tone
+  - condition: "task_results.get('get_adaptation_level') == 'struggling'"
+    action: "change_tone"
+    tones: ["empathetic", "encouraging"]
+  
+  - condition: "task_results.get('get_adaptation_level') == 'thriving'"
+    action: "change_tone"
+    tones: ["encouraging", "playful"]
+  
+  # Language support
   - condition: "task_results.get('offer_language') and len(task_results.get('offer_language', '')) == 2 and task_results.get('offer_language') != 'no'"
     action: "add_persistent_task"
     task_id: "speak_in_language"
+  
+  # Persistent when user isn't responding
+  - condition: "max([task_turn_counts.get(task, 0) for task in current_tasks]) > 2"
+    action: "change_tone"
+    tones: ["persistent"]

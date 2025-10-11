@@ -5,7 +5,7 @@ from datetime import datetime
 
 
 def start_chat():
-    st.session_state.chat_service = ChatService()
+    st.session_state.chat_service = ChatService(debug=True)
     st.session_state.messages = []
     st.session_state.prompt_log = []  # Log all prompts and replies
     starting_msg = st.session_state.chat_service.get_starting_message()
@@ -135,33 +135,42 @@ def main():
             debug_info = st.session_state.chat_service.get_debug_info()
             user_name = st.session_state.chat_service.guide.user_name
             
-            print("\n" + "┏" + "━"*78 + "┓")
-            print(f"┃ 🔄 TURN {debug_info['turn_count']} │ STATE {debug_info['state']}/{len(st.session_state.chat_service.guide.state_machine.states)-1} │ {'✅ FINISHED' if debug_info['is_finished'] else '⏳ IN PROGRESS'}")
-            print("┣" + "━"*78 + "┫")
+            # Get state description
+            state_descriptions = {
+                0: "Getting name & origin",
+                1: "Language & location", 
+                2: "Reflection & suggestions"
+            }
+            current_state_desc = state_descriptions.get(debug_info['state'], f"State {debug_info['state']}")
+            total_states = len(st.session_state.chat_service.guide.state_machine.states)
+            
+            print(f"\nTURN {debug_info['turn_count']} │ PHASE: {current_state_desc} ({debug_info['state']+1}/{total_states}) │ {'✅ CONVERSATION COMPLETE' if debug_info['is_finished'] else '⏳ IN PROGRESS'}")
             
             # User input with actual name
             user_msg = prompt if len(prompt) <= 60 else prompt[:57] + "..."
-            print(f"┃ 👤 {user_name}: {user_msg}")
-            print("┣" + "━"*78 + "┫")
+            print(f"👤 {user_name}: {user_msg}")
             
             # Tasks status
             current = debug_info['current_tasks']
             if current:
-                print(f"┃ 📋 CURRENT: {', '.join(current)}")
+                print(f"📋 CURRENT: {', '.join(current)}")
             else:
-                print(f"┃ 📋 CURRENT: (none - batch complete)")
-            
+                print(f"📋 CURRENT: (none - batch complete)")
+
             # Task results from this turn
             completed_tasks = [f"{t.task_id}='{t.result}'" for t in reply.tasks if t.result]
             if completed_tasks:
-                print(f"┃ ✅ COMPLETED: {', '.join(completed_tasks)}")
-            
+                print(f"✅ COMPLETED: {', '.join(completed_tasks)}")
+
             # Persistent task results
             persistent_results = [f"{t.task_id}='{t.result}'" for t in reply.persistent_tasks if t.result]
             if persistent_results:
-                print(f"┃ 🔄 PERSISTENT: {', '.join(persistent_results)}")
-            
-            print("┣" + "━"*78 + "┫")
+                print(f"🔄 PERSISTENT: {', '.join(persistent_results)}")
+
+            # Failed tasks
+            failed_tasks = [t for t in debug_info['current_tasks'] if debug_info['task_status'].get(t) == "failed"]
+            if failed_tasks:
+                print(f"💀 FAILED: {', '.join(failed_tasks)}")
             
             # Known information
             if debug_info['task_results']:
@@ -171,31 +180,15 @@ def main():
                     memory_line = ', '.join(info_items[:5])
                     if len(memory_line) > 60:
                         memory_line = memory_line[:57] + "..."
-                    print(f"┃ 💾 MEMORY: {memory_line}")
-            
-            print("┣" + "━"*78 + "┫")
+                    print(f"💾 MEMORY: {memory_line}")
             
             # Bot reply - FULL TEXT
-            print("┃ 🤖 Sol:")
-            for line in reply.assistant_reply.split('\n'):
-                # Wrap long lines at 72 chars
-                while len(line) > 72:
-                    print(f"┃   {line[:72]}")
-                    line = line[72:]
-                if line:  # Print remaining part if any
-                    print(f"┃   {line}")
+            print("🤖 Sol:")
+            print(reply.assistant_reply)
             
-            print("┣" + "━"*78 + "┫")
-            print("┃ 📄 FULL PROMPT:")
-            print("┣" + "━"*78 + "┫")
-            for line in outgoing_prompt.split('\n'):
-                # Wrap long lines at 74 chars
-                while len(line) > 74:
-                    print(f"┃ {line[:74]}")
-                    line = line[74:]
-                print(f"┃ {line}")
-            
-            print("┗" + "━"*78 + "┛\n")
+            print("\n📄 FULL PROMPT:")
+            print(outgoing_prompt)
+            print()
                 
         except Exception as e:
             st.error(f"Error: {str(e)}")
