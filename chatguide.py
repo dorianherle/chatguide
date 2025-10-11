@@ -103,7 +103,7 @@ class StateMachine:
 
 
 # ---------- Framework ----------
-class ChatGuideV2:
+class ChatGuide:
     def __init__(self):
         # Core components
         self.guardrails: str = ""

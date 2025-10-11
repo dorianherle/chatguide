@@ -1,4 +1,4 @@
-from chatguide_v2 import ChatGuideV2
+from chatguide import ChatGuide
 import os
 from dotenv import load_dotenv
 
@@ -13,8 +13,8 @@ class ChatService:
     
     def initialize_guide(self):
         """Initialize a fresh ChatGuide instance"""
-        self.guide = ChatGuideV2()
-        self.guide.load_from_file("config_v2.yaml")
+        self.guide = ChatGuide()
+        self.guide.load_from_file("config.yaml")
         
         # Set chatbot name
         self.guide.set_chatbot_name("Sol")
