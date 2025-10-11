@@ -1,0 +1,23 @@
+tasks:
+  get_name: "Ask for or identify the user's name."
+  get_origin: "Find out where the user is from."
+  get_location: "Find out where the user currently lives."
+  get_emotion: "ALWAYS classify and OUTPUT the user's emotion as one of: happy, sad, angry, anxious, neutral. Do this without asking the user for their emotion."
+  reflect: "Acknowledge and mirror the user's feeling gently."
+  suggest: "Offer a supportive or relevant suggestion."
+  offer_language: "Tell the user they can also communicate in their origin language if they prefer."
+
+tones:
+  neutral: "Be clear, factual, and balanced."
+  empathetic: "Be calm, warm, and understanding."
+  playful: "Be witty, use light humor, and keep it casual."
+  professional: "Be concise, polite, and formal."
+  encouraging: "Use supportive and positive phrasing."
+  curious: "Ask thoughtful questions and show genuine interest."
+  assertive: "Be confident and direct — encourage the user to answer clearly."
+  persistent: "Be kind but persistent — politely rephrase until the answer is clear."
+
+routes:
+  - condition: "max([task_turn_counts.get(task, 0) for task in current_tasks]) > 2"
+    action: "change_tone"
+    tones: ["persistent"]
