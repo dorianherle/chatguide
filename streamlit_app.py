@@ -1,11 +1,11 @@
 import streamlit as st
-from chat_service_v2 import ChatServiceV2
+from chat_service import ChatService
 import json
 from datetime import datetime
 
 
 def start_chat():
-    st.session_state.chat_service = ChatServiceV2()
+    st.session_state.chat_service = ChatService()
     st.session_state.messages = []
     st.session_state.prompt_log = []  # Log all prompts and replies
     starting_msg = st.session_state.chat_service.get_starting_message()
