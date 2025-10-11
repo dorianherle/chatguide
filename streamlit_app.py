@@ -120,6 +120,77 @@ def main():
     with col3:
         st.button("🚪 Logout", on_click=logout)
     
+    # Sidebar: What Sol knows about you
+    with st.sidebar:
+        st.header("🧠 What Sol knows about you")
+        
+        debug_info = st.session_state.chat_service.get_debug_info()
+        task_results = debug_info.get('task_results', {})
+        
+        if task_results:
+            # Filter out system tasks
+            user_info = {k: v for k, v in task_results.items() if k not in ['detect_info_updates'] and v}
+            
+            if user_info:
+                # Group by category
+                basic_info = {}
+                moving_info = {}
+                language_info = {}
+                social_info = {}
+                emotional_info = {}
+                goals_info = {}
+                
+                for key, value in user_info.items():
+                    if key in ['get_name', 'get_age', 'get_origin', 'get_location']:
+                        basic_info[key.replace('get_', '').replace('_', ' ').title()] = value
+                    elif key in ['get_move_date', 'get_move_reason', 'get_move_choice']:
+                        moving_info[key.replace('get_', '').replace('_', ' ').title()] = value
+                    elif key in ['get_language_level', 'get_language_comfort']:
+                        language_info[key.replace('get_', '').replace('_', ' ').title()] = value
+                    elif key in ['get_social_network', 'get_family_location', 'get_friends_origin']:
+                        social_info[key.replace('get_', '').replace('_', ' ').title()] = value
+                    elif key in ['get_emotion', 'get_homesickness', 'get_grief_intensity', 'get_adaptation_level']:
+                        emotional_info[key.replace('get_', '').replace('_', ' ').title()] = value
+                    elif key in ['get_biggest_challenge', 'get_support_system', 'get_stay_duration', 'get_primary_goal']:
+                        goals_info[key.replace('get_', '').replace('_', ' ').title()] = value
+                
+                if basic_info:
+                    st.subheader("👤 Basic Info")
+                    for k, v in basic_info.items():
+                        st.write(f"**{k}:** {v}")
+                
+                if moving_info:
+                    st.subheader("✈️ Moving Details")
+                    for k, v in moving_info.items():
+                        st.write(f"**{k}:** {v}")
+                
+                if language_info:
+                    st.subheader("🗣️ Language")
+                    for k, v in language_info.items():
+                        st.write(f"**{k}:** {v}")
+                
+                if social_info:
+                    st.subheader("👥 Social Connections")
+                    for k, v in social_info.items():
+                        st.write(f"**{k}:** {v}")
+                
+                if emotional_info:
+                    st.subheader("💭 Emotional State")
+                    for k, v in emotional_info.items():
+                        st.write(f"**{k}:** {v}")
+                
+                if goals_info:
+                    st.subheader("🎯 Goals & Support")
+                    for k, v in goals_info.items():
+                        st.write(f"**{k}:** {v}")
+            else:
+                st.info("Sol is getting to know you... 🤗")
+        else:
+            st.info("Sol is getting to know you... 🤗")
+        
+        st.divider()
+        st.caption(f"Turn: {debug_info.get('turn_count', 0)} | Phase: {debug_info.get('state', 0) + 1}")
+    
     # Visual divider between controls and chat
     st.divider()
     
