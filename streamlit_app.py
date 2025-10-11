@@ -57,8 +57,8 @@ def main():
                 st.error("❌ Invalid passcode")
         return
     
-    st.title("🤖 ChatGuide Demo")
-    st.markdown("Test the conversational AI with structured task flow")
+    st.title("Belonging Demo")
+    st.markdown("Test the Belonging Chatbot")
     
     if "chat_service" not in st.session_state or st.session_state.chat_service is None:
         start_chat()
