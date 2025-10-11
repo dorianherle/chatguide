@@ -11,7 +11,7 @@ guide.set_task_flow([
     ["get_name", "get_origin"],
     ["offer_language","get_location"],
     ["reflect", "suggest"]
-], persistent=["get_emotion"])
+], persistent=["get_emotion", "detect_info_updates"])
 
 starting_message = "Hi there! My name is Sol. Tell me areyou ready for a realy reeealy hard question? ;)"
 print(starting_message)
@@ -28,7 +28,7 @@ while not guide.all_done():
         print("👋 Goodbye!")
         break
 
-    guide.chat_history += f"\nUser: {user_input}"
+    guide.add_to_history("User", user_input)
 
     print("\n===== FULL PROMPT (DEBUG) =====\n")
     print(guide.prompt())
