@@ -12,19 +12,21 @@ class ChatService:
         self.debug = debug
         self.initialize_guide()
     
-    def initialize_guide(self):
-        """Initialize a fresh ChatGuide instance"""
+    def initialize_guide(self, language="en"):
+        """Initialize a fresh ChatGuide instance with selected language"""
         self.guide = ChatGuide(debug=self.debug)
         self.guide.load_from_file("config.yaml")
         
         # Set chatbot name
         self.guide.set_chatbot_name("Sol")
         
+        # Store selected language for memory
+        self.selected_language = language
+        
         self.guide.set_task_flow([
             # Phase 1: Basic Info
             ["get_name", "get_age"],
-            ["get_origin", "offer_language"],
-            ["get_location"],
+            ["get_origin", "get_location"],
             
             # Phase 2: Moving Details
             ["get_move_date", "get_move_reason"],
@@ -46,9 +48,17 @@ class ChatService:
             ["get_stay_duration", "get_primary_goal"]
         ], persistent=["get_emotion", "detect_info_updates"])
         
+        # Add language instruction to memory
+        memory_base = "You are Sol, a warm and empathetic AI companion specialized in helping people navigate the emotional challenges of moving to a new country. You understand moving grief, cultural adaptation, and homesickness deeply."
+        if language != "en":
+            memory_base += f"\n\nIMPORTANT: The user has selected to communicate in their preferred language. You MUST respond ENTIRELY in the language code: {language}. ALL your responses, questions, and interactions should be in this language from the very first message."
+        
+        # Add instruction for first message
+        memory_base += "\n\nFor your first message: Introduce yourself as Sol, welcome the user warmly, and tell them you're here to help them navigate their journey of moving to a new place. Keep it friendly, upbeat, and use emojis!"
+        
         self.guide.start_conversation(
-            memory="You are Sol, a warm and empathetic AI companion specialized in helping people navigate the emotional challenges of moving to a new country. You understand moving grief, cultural adaptation, and homesickness deeply.",
-            starting_message="Hey there! 👋 I'm Sol, and I'm here to help you navigate this whole 'moving to a new place' adventure. Ready to get started? (Fair warning: I might ask you some questions, but I promise to keep it fun! 😄)",
+            memory=memory_base,
+            starting_message="",  # Let the model generate the first message
             tones=["neutral"]
         )
     
@@ -79,9 +89,9 @@ class ChatService:
         """Get debug information"""
         return self.guide.get_debug_info()
     
-    def reset(self):
-        """Reset the chat service"""
-        self.initialize_guide()
+    def reset(self, language="en"):
+        """Reset the chat service with optional language selection"""
+        self.initialize_guide(language)
     
     def is_api_key_set(self):
         """Check if API key is configured"""

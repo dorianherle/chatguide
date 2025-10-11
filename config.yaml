@@ -19,7 +19,6 @@ tasks:
   # Language & Integration
   get_language_level: "enum, description: 'User's proficiency in the local language. Choose: none, beginner, intermediate, advanced, native'"
   get_language_comfort: "enum, description: 'How comfortable does the user feel speaking the local language? Choose: very_uncomfortable, uncomfortable, neutral, comfortable, very_comfortable'"
-  offer_language: "enum, description: 'Ask if user wants to speak in their origin language. If YES: return 2-char code. If NO: return no. If not answered: empty string'"
   
   # Social Connections
   get_social_network: "enum, description: 'How strong is the user's social network here? Choose: none, minimal, moderate, strong'"
@@ -42,7 +41,6 @@ tasks:
   
   # System Tasks
   detect_info_updates: "string, description: 'ALWAYS monitor corrections. Output: update: task_id = new_value. Inform user of correction'"
-  speak_in_language: "string, description: 'Speak in the language specified by offer_language'"
   
 tones:
   neutral: "Be witty, funny, and humorous with emojis. Use light humor, clever wordplay, and be charmingly entertaining while staying helpful. Sprinkle in relevant emojis to make conversations more engaging and fun! 😄"
@@ -87,10 +85,6 @@ routes:
     action: "change_tone"
     tones: ["encouraging", "playful"]
   
-  # Language support
-  - condition: "task_results.get('offer_language') and len(task_results.get('offer_language', '')) == 2 and task_results.get('offer_language') != 'no'"
-    action: "add_persistent_task"
-    task_id: "speak_in_language"
   
   # Persistent when user isn't responding
   - condition: "max([task_turn_counts.get(task, 0) for task in current_tasks]) > 2"

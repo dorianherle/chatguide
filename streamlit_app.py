@@ -4,11 +4,23 @@ import json
 from datetime import datetime
 
 
-def start_chat():
+def start_chat(language="en"):
     st.session_state.chat_service = ChatService(debug=True)
+    st.session_state.chat_service.initialize_guide(language)
     st.session_state.messages = []
     st.session_state.prompt_log = []  # Log all prompts and replies
-    starting_msg = st.session_state.chat_service.get_starting_message()
+    
+    # Generate first message from the model in the selected language
+    import os
+    from dotenv import load_dotenv
+    load_dotenv()
+    api_key = os.getenv('GEMINI_API_KEY')
+    
+    first_reply = st.session_state.chat_service.guide.chat(
+        model="gemini/gemini-2.5-flash-lite",
+        api_key=api_key
+    )
+    starting_msg = first_reply.assistant_reply
     st.session_state.messages.append({
         "role": "assistant", 
         "content": starting_msg
@@ -62,8 +74,25 @@ def main():
     st.title("Belonging Demo V2 🚀")
     st.markdown("**NEW:** Explicit state machine + output validation")
     
+    # Language selector before starting chat
     if "chat_service" not in st.session_state or st.session_state.chat_service is None:
-        start_chat()
+        st.markdown("### Choose your language / Choisissez votre langue")
+        language_options = {
+            "English": "en",
+            "Español": "es",
+            "Français": "fr",
+            "Deutsch": "de",
+            "Italiano": "it",
+            "Português": "pt",
+            "中文": "zh",
+            "日本語": "ja",
+            "한국어": "ko"
+        }
+        selected_language = st.selectbox("Language:", list(language_options.keys()))
+        if st.button("Start Chat / Commencer"):
+            start_chat(language_options[selected_language])
+            st.rerun()
+        return
 
     # Top-level controls on main page
     def logout():
