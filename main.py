@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-guide = ChatGuide()
+guide = ChatGuide(api_key=GEMINI_API_KEY)
 guide.load_from_file("config.yaml")
 guide.set_task_flow([
     ["get_name", "get_origin"],

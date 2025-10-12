@@ -8,9 +8,9 @@ def start_chat(language="en"):
     st.session_state.chat_service = ChatService(debug=True)
     st.session_state.chat_service.initialize_guide(language)
     st.session_state.messages = []
-    st.session_state.prompt_log = []  # Log all prompts and replies
+    st.session_state.prompt_log = []
     
-    # Generate first message from the model in the selected language
+    # Generate first message using the "introduce_yourself" task
     import os
     from dotenv import load_dotenv
     load_dotenv()
@@ -20,10 +20,10 @@ def start_chat(language="en"):
         model="gemini/gemini-2.5-flash-lite",
         api_key=api_key
     )
-    starting_msg = first_reply.assistant_reply
+    
     st.session_state.messages.append({
         "role": "assistant", 
-        "content": starting_msg
+        "content": first_reply.assistant_reply
     })
 
 def download_chat_data():
@@ -125,7 +125,7 @@ def main():
         st.header("🧠 What Sol knows about you")
         
         debug_info = st.session_state.chat_service.get_debug_info()
-        task_results = debug_info.get('task_results', {})
+        task_results = debug_info['tracker']['results']
         
         if task_results:
             # Filter out system tasks
@@ -189,7 +189,7 @@ def main():
             st.info("Sol is getting to know you... 🤗")
         
         st.divider()
-        st.caption(f"Turn: {debug_info.get('turn_count', 0)} | Phase: {debug_info.get('state', 0) + 1}")
+        st.caption(f"Turn: {debug_info['interaction']['turn_count']} | Phase: {debug_info['flow']['current_index'] + 1}")
     
     # Visual divider between controls and chat
     st.divider()
@@ -231,64 +231,36 @@ def main():
             with st.chat_message("assistant"):
                 st.write(reply.assistant_reply)
             
-            # Print clean debug info to console
-            debug_info = st.session_state.chat_service.get_debug_info()
-            user_name = st.session_state.chat_service.guide.user_name
+            # Beautiful debug output to console
+            import sys
+            from src.chatguide import ChatGuide
             
-            # Get state description
-            state_descriptions = {
-                0: "Getting name & origin",
-                1: "Language & location", 
-                2: "Reflection & suggestions"
-            }
-            current_state_desc = state_descriptions.get(debug_info['state'], f"State {debug_info['state']}")
-            total_states = len(st.session_state.chat_service.guide.state_machine.states)
+            # Force flush to ensure output appears
+            print("\n" + "="*70, file=sys.stderr, flush=True)
+            print("DEBUG OUTPUT", file=sys.stderr, flush=True)
+            print("="*70, file=sys.stderr, flush=True)
             
-            print(f"\nTURN {debug_info['turn_count']} │ PHASE: {current_state_desc} ({debug_info['state']+1}/{total_states}) │ {'✅ CONVERSATION COMPLETE' if debug_info['is_finished'] else '⏳ IN PROGRESS'}")
+            # Compact one-liner
+            compact = st.session_state.chat_service.guide.print_debug_compact()
+            print(f"\n{compact}", file=sys.stderr, flush=True)
             
-            # User input with actual name
-            user_msg = prompt if len(prompt) <= 60 else prompt[:57] + "..."
-            print(f"👤 {user_name}: {user_msg}")
+            # Beautiful formatted response
+            formatted = ChatGuide.print_response(reply)
+            print(formatted, file=sys.stderr, flush=True)
             
-            # Tasks status
-            current = debug_info['current_tasks']
-            if current:
-                print(f"📋 CURRENT: {', '.join(current)}")
-            else:
-                print(f"📋 CURRENT: (none - batch complete)")
-
-            # Task results from this turn
-            completed_tasks = [f"{t.task_id}='{t.result}'" for t in reply.tasks if t.result]
-            if completed_tasks:
-                print(f"✅ COMPLETED: {', '.join(completed_tasks)}")
-
-            # Persistent task results
-            persistent_results = [f"{t.task_id}='{t.result}'" for t in reply.persistent_tasks if t.result]
-            if persistent_results:
-                print(f"🔄 PERSISTENT: {', '.join(persistent_results)}")
-
-            # Failed tasks
-            failed_tasks = [t for t in debug_info['current_tasks'] if debug_info['task_status'].get(t) == "failed"]
-            if failed_tasks:
-                print(f"💀 FAILED: {', '.join(failed_tasks)}")
+            # Full state debug
+            full_debug = st.session_state.chat_service.guide.print_debug()
+            print(full_debug, file=sys.stderr, flush=True)
             
-            # Known information
-            if debug_info['task_results']:
-                info_items = [f"{k}={v}" for k, v in debug_info['task_results'].items() if v and k not in ['detect_info_updates']]
-                if info_items:
-                    # Truncate memory line if too long
-                    memory_line = ', '.join(info_items[:5])
-                    if len(memory_line) > 60:
-                        memory_line = memory_line[:57] + "..."
-                    print(f"💾 MEMORY: {memory_line}")
+            # Full prompt
+            print("\n" + "=" * 70, file=sys.stderr, flush=True)
+            print("FULL PROMPT:", file=sys.stderr, flush=True)
+            print("-" * 70, file=sys.stderr, flush=True)
+            print(outgoing_prompt, file=sys.stderr, flush=True)
+            print("=" * 70 + "\n", file=sys.stderr, flush=True)
             
-            # Bot reply - FULL TEXT
-            print("🤖 Sol:")
-            print(reply.assistant_reply)
-            
-            print("\n📄 FULL PROMPT:")
-            print(outgoing_prompt)
-            print()
+            # Rerun to update sidebar with fresh state
+            st.rerun()
                 
         except Exception as e:
             st.error(f"Error: {str(e)}")
