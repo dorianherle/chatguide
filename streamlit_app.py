@@ -2,10 +2,15 @@ import streamlit as st
 from chat_service import ChatService
 import json
 from datetime import datetime
+import logging
+
+# Suppress verbose Gemini SDK logs
+logging.getLogger("google.ai.generativelanguage").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 def start_chat(language="en"):
-    st.session_state.chat_service = ChatService(debug=True)
+    st.session_state.chat_service = ChatService(debug=True)  # Temporarily on to debug routes
     st.session_state.chat_service.initialize_guide(language)
     st.session_state.messages = []
     st.session_state.prompt_log = []
@@ -239,6 +244,11 @@ def main():
             print("\n" + "="*70, file=sys.stderr, flush=True)
             print("DEBUG OUTPUT", file=sys.stderr, flush=True)
             print("="*70, file=sys.stderr, flush=True)
+            
+            # RAW JSON RESPONSE (to debug correction detection)
+            print("\nRAW JSON RESPONSE:", file=sys.stderr, flush=True)
+            print(reply.model_dump_json(indent=2), file=sys.stderr, flush=True)
+            print("", file=sys.stderr, flush=True)
             
             # Compact one-liner
             compact = st.session_state.chat_service.guide.print_debug_compact()

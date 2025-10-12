@@ -49,7 +49,8 @@ class ChatService:
             batches=[
                 ["introduce_yourself"],                                    # Playful intro
                 ["get_name", "get_age", "get_origin"],                    # Who are you?
-                ["get_location","get_move_date", "get_move_reason", "get_move_choice"],  # The move story
+                ["get_location","get_move_date"],
+                ["get_move_reason", "get_move_choice"],  # The move story
                 ["get_language_level"],                   # Where & how now
                 ["get_social_network", "get_adaptation_level"],            # Connections
                 ["get_family_location"],                  # How feeling
@@ -68,7 +69,11 @@ class ChatService:
         self.guide.add_user_message(user_input)
         outgoing_prompt = self.guide.get_prompt()
         api_key = os.getenv("GEMINI_API_KEY")
-        reply = self.guide.chat(model="gemini/gemini-2.5-flash-lite", api_key=api_key)
+        reply = self.guide.chat(
+            model="gemini/gemini-2.5-flash-lite", 
+            api_key=api_key
+            # max_tokens defaults to 4000
+        )
         return reply, outgoing_prompt
     
     def get_debug_info(self):

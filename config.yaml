@@ -11,9 +11,9 @@ tasks:
   introduce_yourself: "Introduce yourself as Sol, a friendly AI helping people who recently moved to a new country. Speak in {language}. Ask them if they are ready for a realy reeealy hard question? ;)"
   
   # Basic Identity
-  get_name: "string, The user's name"
-  get_age: "int, The user's age"
-  get_origin: "string, The user's country of origin"
+  get_name: "string, Extract ONLY the user's name (a text name). If they provide a number or off-topic info, return empty string."
+  get_age: "int, Extract ONLY the user's age (a number like 25, 32, etc). If they provide text/names, return empty string."
+  get_origin: "string, Extract ONLY the user's country of origin (a country name). If they provide other info, return empty string."
   
   # The Move
   get_location: "string, The user's current city/country"
@@ -36,8 +36,8 @@ tasks:
   get_stay_duration: "enum, How long will they stay? Choose: temporary, few_years, permanent, unsure"
   get_primary_goal: "string, What do they want from this app? (e.g., make friends, find resources, feel less alone)"
   
-  # System Tasks
-  detect_info_updates: "string, ALWAYS monitor corrections. Output: update: task_id = new_value"
+  # System Tasks (CRITICAL - must always execute)
+  detect_info_updates: "MANDATORY TASK - NEVER skip this. Monitor if user corrects previous answers. Examples: 'Actually my name is X', 'No I'm Y years old', 'I meant Z'. When user corrects, output EXACTLY in this format: 'update: task_id = new_value' (e.g., 'update: get_name = John' or 'update: get_name = John, update: get_age = 32'). If NO corrections detected, return empty string. CHECK EVERY TURN."
   
 tones:
   neutral: "Be witty, funny, and humorous with emojis. Use light humor, clever wordplay, and be charmingly entertaining while staying helpful. Sprinkle in relevant emojis to make conversations more engaging and fun! 😄"
@@ -50,6 +50,10 @@ tones:
   persistent: "Be kind but persistent — politely rephrase until the answer is clear."
 
 routes:
+  # CRITICAL: Process corrections from detect_info_updates
+  - condition: "'update:' in task_results.get('detect_info_updates', '')"
+    action: "process_corrections"
+  
   # Set user name from task result
   - condition: "task_results.get('get_name') and task_results.get('get_name') != user_name"
     action: "set"
@@ -83,7 +87,7 @@ routes:
     action: "interaction.set_tones"
     tones: ["encouraging", "playful"]
   
-  # Not responding? Force ahead
-  - condition: "max([task_attempts.get(task, 0) for task in current_tasks]) > 2"
+  # Not responding or stuck? Force ahead after 4 attempts
+  - condition: "len(current_tasks) > 0 and max([task_attempts.get(task, 0) for task in current_tasks]) > 4"
     action: "flow.advance"
     force: true

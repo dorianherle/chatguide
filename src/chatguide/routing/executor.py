@@ -28,6 +28,10 @@ class RouteExecutor:
         if action == "append":
             return self._append_field(route)
         
+        # Special actions
+        if action == "process_corrections":
+            return self._process_corrections(route)
+        
         # Method call (container.method)
         if '.' in action:
             container, method = action.split('.', 1)
@@ -156,3 +160,46 @@ class RouteExecutor:
             if self.state.debug:
                 print(f"Route execution error: {e}")
             return False
+    
+    def _process_corrections(self, route: dict) -> bool:
+        """Parse and apply corrections from detect_info_updates.
+        
+        Parses strings like:
+            "update: get_name = John, update: get_age = 32"
+        
+        And updates tracker.results accordingly.
+        Note: History name updates happen via the separate route that sets participants.user.
+        """
+        correction_text = self.state.tracker.results.get('detect_info_updates', '')
+        if not correction_text or 'update:' not in correction_text:
+            return False
+        
+        # Split by "update:" to get individual corrections
+        updates = correction_text.split('update:')
+        
+        for update in updates:
+            update = update.strip()
+            if not update or '=' not in update:
+                continue
+            
+            # Parse "task_id = value" (update: prefix already removed)
+            try:
+                # Remove any leading comma from split
+                update = update.lstrip(',').strip()
+                
+                # Split by '='
+                task_id, value = update.split('=', 1)
+                task_id = task_id.strip()
+                value = value.strip().rstrip(',')  # Remove trailing comma too
+                
+                # Update the tracker
+                old_value = self.state.tracker.results.get(task_id, "NOT_SET")
+                self.state.tracker.results[task_id] = value
+                
+                if self.state.debug:
+                    print(f"Correction applied: {task_id} '{old_value}' -> '{value}'", flush=True)
+            except Exception as e:
+                if self.state.debug:
+                    print(f"Failed to parse correction: '{update}' - {e}", flush=True)
+        
+        return True

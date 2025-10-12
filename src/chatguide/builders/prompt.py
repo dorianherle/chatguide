@@ -28,7 +28,7 @@ GUARDRAILS:
 CURRENT TASKS:
 {self._format_tasks(self.state.get_current_tasks())}
 
-PERSISTENT TASKS:
+PERSISTENT TASKS (MUST return ALL in EVERY response):
 {self._format_tasks(self.state.get_persistent_tasks())}
 
 NEXT TASKS:
@@ -45,17 +45,15 @@ OUTPUT FORMAT:
     }}
   ],
   "persistent_tasks": [
-    {{
-      "task_id": "task_name",
-      "result": "output_value"
-    }}
+{self._format_persistent_output()}
   ],
   "assistant_reply": "your_response_here"
 }}
 
-RULES:
-1. Once all CURRENT TASKS are completed, IMMEDIATELY advance to NEXT TASKS
-2. Return empty string if task not completed
+CRITICAL RULES:
+1. ALWAYS return ALL {len(self.state.get_persistent_tasks())} persistent tasks in EVERY response
+2. Once all CURRENT TASKS are completed, IMMEDIATELY advance to NEXT TASKS
+3. Return empty string for tasks not completed
 
 ==============================================================================='''.strip()
     
@@ -75,8 +73,19 @@ RULES:
         return "\n".join(parts)
     
     def _format_history(self) -> str:
-        """Format recent chat history."""
-        return "\n".join(self.state.conversation.get_recent_history())
+        """Format recent chat history with dynamic name resolution."""
+        history = self.state.conversation.get_recent_history()
+        formatted = []
+        for msg in history:
+            role = msg["role"]
+            text = msg["text"]
+            # Resolve current participant names dynamically
+            if role == self.state.participants.user or role == "user":
+                role = self.state.participants.user
+            elif role == self.state.participants.chatbot or role == "assistant":
+                role = self.state.participants.chatbot
+            formatted.append(f"{role}: {text}")
+        return "\n".join(formatted)
     
     def _format_tasks(self, task_ids: List[str]) -> str:
         """Format task list with descriptions."""
@@ -104,3 +113,28 @@ RULES:
             for t in self.state.interaction.tones
         ]
         return " ".join(instructions)
+    
+    def _format_persistent_output(self) -> str:
+        """Format persistent tasks for OUTPUT FORMAT example.
+        
+        Dynamically builds the example based on active persistent tasks.
+        """
+        persistent = self.state.get_persistent_tasks()
+        if not persistent:
+            return ""
+        
+        lines = []
+        for i, task_id in enumerate(persistent):
+            desc = self.config.get_task_description(task_id)
+            # Extract hint from description if available
+            hint = "result_value"
+            if "Choose:" in desc:
+                # Enum task - show options
+                hint = desc.split("Choose:")[1].split(",")[0].strip() + "..."
+            elif task_id == "detect_info_updates":
+                hint = "update: task_id = value OR empty_string"
+            
+            comma = "," if i < len(persistent) - 1 else ""
+            lines.append(f'    {{\n      "task_id": "{task_id}",\n      "result": "{hint}"\n    }}{comma}')
+        
+        return "\n".join(lines)

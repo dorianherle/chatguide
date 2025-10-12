@@ -98,7 +98,7 @@ class ChatGuide:
         model: str = "gemini/gemini-2.5-flash-lite",
         api_key: str = None,
         temperature: float = 0.6,
-        max_tokens: int = 256
+        max_tokens: int = 4000
     ) -> ChatGuideReply:
         """Execute one chat turn."""
         # Build prompt
@@ -148,10 +148,10 @@ class ChatGuide:
             if task_result.result.strip():
                 self.state.tracker.results[task_result.task_id] = task_result.result.strip()
         
-        # Execute routes
+        # Execute routes FIRST (so corrections apply before adding message to history)
         self._process_routes()
 
-        # Update history
+        # Update history (now with corrected state)
         self.state.conversation.add_message(
             self.state.participants.chatbot,
             reply.assistant_reply
@@ -183,6 +183,8 @@ class ChatGuide:
             
             # Evaluate and execute
             if RouteEvaluator.evaluate(condition, context):
+                action = route.get('action', '')
+                self._log(f"Route fired: {action}")
                 if self._route_executor.execute(route):
                     self._executed_routes.add(route_id)
                     break
