@@ -1,8 +1,16 @@
-# ChatGuide
+<p align="center">
+  <img src="static/chatguide.png" alt="ChatGuide" width="800"/>
+</p>
 
-**A lightweight, modular framework for building goal-oriented conversational AI.**
 
-ChatGuide makes it easy to create conversations that have a **purpose**—whether that's tech support triage, user onboarding, lead qualification, or interactive forms. Instead of free-form chats that wander aimlessly, ChatGuide keeps conversations focused while feeling natural and adaptive.
+
+<p align="center">
+  <strong>A lightweight, modular framework for building goal-oriented conversational AI.</strong>
+</p>
+
+<p align="center">
+ChatGuide makes it easy to create conversations that have a <strong>purpose</strong>—whether that's tech support triage, user onboarding, lead qualification, or interactive forms. Instead of free-form chats that wander aimlessly, ChatGuide keeps conversations focused while feeling natural and adaptive.
+</p>
 
 ---
 
@@ -169,7 +177,7 @@ while not guide.state.flow.is_finished():
     
     # 3. Show the response
     print(f"Bot: {reply.assistant_reply}")
-    
+
     # 4. Debug info (optional)
     if guide.debug:
         batch = guide.state.flow.current_index
