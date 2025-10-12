@@ -1,4 +1,4 @@
-from chatguide import ChatGuide
+from .chatguide import ChatGuide
 import os
 from dotenv import load_dotenv
 
