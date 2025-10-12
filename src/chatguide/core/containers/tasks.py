@@ -4,13 +4,13 @@ from collections import defaultdict
 from typing import Dict
 
 
-class TaskTracker:
+class Tasks:
     """Tracks task status, attempts, and results.
     
     All attributes are directly editable:
-        tracker.status["task1"] = "completed"
-        tracker.results["name"] = "Alice"
-        tracker.attempts["task1"] = 5
+        tasks.status["task1"] = "completed"
+        tasks.results["name"] = "Alice"
+        tasks.attempts["task1"] = 5
     """
     
     def __init__(self):

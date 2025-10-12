@@ -1,9 +1,10 @@
-﻿"""Conversation state - assembles all containers."""
+"""Conversation state - assembles all containers."""
 
-from .containers.task_flow import TaskFlow
-from .containers.task_tracker import TaskTracker
+from .containers.flow import Flow
+from .containers.tasks import Tasks
 from .containers.conversation import Conversation
-from .containers.interaction import Interaction
+from .containers.tones import Tones
+from .containers.routes import Routes
 from .containers.participants import Participants
 from typing import List
 
@@ -17,10 +18,11 @@ class ConversationState:
     
     def __init__(self, debug: bool = False):
         # Sub-containers
-        self.flow = TaskFlow(debug=debug)
-        self.tracker = TaskTracker()
+        self.flow = Flow(debug=debug)
+        self.tasks = Tasks()
         self.conversation = Conversation()
-        self.interaction = Interaction()
+        self.tones = Tones()
+        self.routes = Routes()
         self.participants = Participants()
         
         self.debug = debug
@@ -30,12 +32,12 @@ class ConversationState:
         """Get incomplete tasks from current batch."""
         current_batch = self.flow.get_current_batch()
         return [t for t in current_batch 
-                if self.tracker.status.get(t) != "completed"]
+                if self.tasks.status.get(t) != "completed"]
     
     def get_persistent_tasks(self) -> List[str]:
         """Get active persistent tasks."""
         return [t for t in self.flow.persistent 
-                if self.tracker.status.get(t) == "active"]
+                if self.tasks.status.get(t) == "active"]
     
     def is_finished(self) -> bool:
         """Check if conversation is complete."""
@@ -47,9 +49,10 @@ class ConversationState:
         return {
             # Container data
             "flow": self.flow.to_dict(),
-            "tracker": self.tracker.to_dict(),
+            "tasks": self.tasks.to_dict(),
             "conversation": self.conversation.to_dict(),
-            "interaction": self.interaction.to_dict(),
+            "tones": self.tones.to_dict(),
+            "routes": self.routes.to_dict(),
             "participants": self.participants.to_dict(),
             
             # Convenience fields (for debugging/display)

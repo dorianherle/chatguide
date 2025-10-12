@@ -66,9 +66,10 @@ class DebugFormatter:
             prompt: The prompt text
         """
         flow = state_dict['flow']
-        tracker = state_dict['tracker']
+        tasks = state_dict['tasks']
         conv = state_dict['conversation']
-        inter = state_dict['interaction']
+        tones = state_dict.get('tones', {'active': []})
+        routes = state_dict.get('routes', {})
         parts = state_dict['participants']
         
         lines = []
@@ -95,10 +96,10 @@ class DebugFormatter:
         lines.append("TRACKER:")
         
         # Status breakdown
-        completed = [k for k, v in tracker['status'].items() if v == 'completed']
-        pending = [k for k, v in tracker['status'].items() if v == 'pending']
-        failed = [k for k, v in tracker['status'].items() if v == 'failed']
-        active = [k for k, v in tracker['status'].items() if v == 'active']
+        completed = [k for k, v in tasks['status'].items() if v == 'completed']
+        pending = [k for k, v in tasks['status'].items() if v == 'pending']
+        failed = [k for k, v in tasks['status'].items() if v == 'failed']
+        active = [k for k, v in tasks['status'].items() if v == 'active']
         
         if completed:
             lines.append(f"  Completed: {', '.join(completed)}")
@@ -110,16 +111,16 @@ class DebugFormatter:
             lines.append(f"  Active:    {', '.join(active)}")
         
         # Results
-        if tracker['results']:
+        if tasks['results']:
             lines.append("")
             lines.append("  Results:")
-            for k, v in tracker['results'].items():
+            for k, v in tasks['results'].items():
                 if k not in ['detect_info_updates']:
                     display_v = v if len(v) <= 40 else v[:37] + "..."
                     lines.append(f"    {k} = \"{display_v}\"")
         
         # Attempts (only show > 0)
-        attempts = {k: v for k, v in tracker['attempts'].items() if v > 0}
+        attempts = {k: v for k, v in tasks['attempts'].items() if v > 0}
         if attempts:
             lines.append("")
             lines.append(f"  Attempts: {', '.join([f'{k}={v}' for k, v in attempts.items()])}")
@@ -137,11 +138,11 @@ class DebugFormatter:
                 preview = msg if len(msg) <= 60 else msg[:57] + "..."
                 lines.append(f"    {preview}")
         
-        # Interaction
+        # Tones & Turn info
         lines.append("")
-        lines.append("INTERACTION:")
-        lines.append(f"  Tones: {', '.join(inter['tones'])}")
-        lines.append(f"  Turn:  {inter['turn_count']}")
+        lines.append("CONVERSATION:")
+        lines.append(f"  Tones: {', '.join(tones['active'])}")
+        lines.append(f"  Turn:  {conv['turn_count']}")
         
         # Participants
         lines.append("")
@@ -166,13 +167,14 @@ class DebugFormatter:
     def format_compact(state_dict: Dict[str, Any]) -> str:
         """Compact one-line debug output."""
         flow = state_dict['flow']
-        inter = state_dict['interaction']
-        tracker = state_dict['tracker']
+        tones = state_dict.get('tones', {'active': []})
+        tasks = state_dict['tasks']
+        conv = state_dict['conversation']
         
         current = state_dict.get('current_tasks', [])
-        completed_count = sum(1 for s in tracker['status'].values() if s == 'completed')
+        completed_count = sum(1 for s in tasks['status'].values() if s == 'completed')
         
-        return (f"Turn {inter['turn_count']} | "
+        return (f"Turn {conv['turn_count']} | "
                 f"Batch {flow['current_index']}/{len(flow['batches'])} | "
                 f"Current: {', '.join(current) if current else 'none'} | "
                 f"Completed: {completed_count}")

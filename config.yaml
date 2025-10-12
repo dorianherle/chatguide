@@ -62,29 +62,29 @@ routes:
   
   # Emotion-based tone changes
   - condition: "task_results.get('get_emotion') in ['sad', 'overwhelmed', 'homesick']"
-    action: "interaction.set_tones"
+    action: "tones.set_tones"
     tones: ["empathetic"]
   
   - condition: "task_results.get('get_emotion') in ['angry', 'anxious']"
-    action: "interaction.set_tones"
+    action: "tones.set_tones"
     tones: ["empathetic", "curious"]
   
   - condition: "task_results.get('get_emotion') == 'happy'"
-    action: "interaction.set_tones"
+    action: "tones.set_tones"
     tones: ["playful"]
   
   # Grief intensity-based tone
   - condition: "task_results.get('get_grief_intensity') == 'severe'"
-    action: "interaction.set_tones"
+    action: "tones.set_tones"
     tones: ["empathetic"]
   
   # Adaptation-based tone
   - condition: "task_results.get('get_adaptation_level') == 'struggling'"
-    action: "interaction.set_tones"
+    action: "tones.set_tones"
     tones: ["empathetic", "encouraging"]
   
   - condition: "task_results.get('get_adaptation_level') == 'thriving'"
-    action: "interaction.set_tones"
+    action: "tones.set_tones"
     tones: ["encouraging", "playful"]
   
   # Not responding or stuck? Force ahead after 4 attempts

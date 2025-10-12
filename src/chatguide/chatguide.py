@@ -1,4 +1,4 @@
-﻿"""ChatGuide - main orchestrator."""
+"""ChatGuide - main orchestrator."""
 
 import logging
 from typing import List, Set, Optional, Dict, Any
@@ -29,7 +29,6 @@ class ChatGuide:
         self.api_key = api_key
         
         # Internal
-        self._executed_routes: Set[str] = set()
         self._route_executor = RouteExecutor(self)
         
         # Logging
@@ -71,9 +70,9 @@ class ChatGuide:
         # Initialize task statuses via direct access
         for batch in batches:
             for task in batch:
-                self.state.tracker.status[task] = "pending"
+                self.state.tasks.status[task] = "pending"
         for task in (persistent or []):
-            self.state.tracker.status[task] = "active"
+            self.state.tasks.status[task] = "active"
     
     # ==================================================================
     # Conversation
@@ -86,8 +85,8 @@ class ChatGuide:
         and let the LLM generate the intro dynamically.
         """
         self.state.conversation.memory = memory
-        self.state.interaction.tones = tones
-        self.state.interaction.turn_count = 0
+        self.state.tones.active = tones
+        self.state.conversation.turn_count = 0
     
     def add_user_message(self, message: str):
         """Add user message to history."""
@@ -103,7 +102,7 @@ class ChatGuide:
         """Execute one chat turn."""
         # Build prompt
         prompt = PromptBuilder(self.config, self.state).build()
-        self.state.interaction.turn_count += 1
+        self.state.conversation.turn_count += 1
         
         # Call LLM
         key = api_key or self.api_key
@@ -128,7 +127,7 @@ class ChatGuide:
     # ==================================================================
     def _process_reply(self, reply: ChatGuideReply):
         """Process LLM reply and update state."""
-        self._executed_routes.clear()
+        self.state.routes.clear_turn()
 
         # Process batch tasks
         for task_result in reply.tasks:
@@ -136,17 +135,17 @@ class ChatGuide:
             result = task_result.result.strip()
             
             if task_id in self.state.get_current_tasks():
-                self.state.tracker.increment_attempt(task_id)
+                self.state.tasks.increment_attempt(task_id)
             
             if result:
-                self.state.tracker.results[task_id] = result
-                self.state.tracker.status[task_id] = "completed"
+                self.state.tasks.results[task_id] = result
+                self.state.tasks.status[task_id] = "completed"
                 self._log(f"Task '{task_id}': {result}")
 
         # Process persistent tasks
         for task_result in reply.persistent_tasks:
             if task_result.result.strip():
-                self.state.tracker.results[task_result.task_id] = task_result.result.strip()
+                self.state.tasks.results[task_result.task_id] = task_result.result.strip()
         
         # Execute routes FIRST (so corrections apply before adding message to history)
         self._process_routes()
@@ -167,15 +166,16 @@ class ChatGuide:
             condition = route.get("condition", "")
             route_id = f"route_{i}"
             
-            if route_id in self._executed_routes:
+            # Skip if already fired this turn
+            if route_id in self.state.routes.fired_this_turn:
                 continue
     
             # Build context
             context = {
-                "task_results": self.state.tracker.results,
-                "turn_count": self.state.interaction.turn_count,
+                "task_results": self.state.tasks.results,
+                "turn_count": self.state.conversation.turn_count,
                 "batch_index": self.state.flow.current_index,
-                "task_attempts": dict(self.state.tracker.attempts),
+                "task_attempts": dict(self.state.tasks.attempts),
                 "current_tasks": self.state.get_current_tasks(),
                 "user_name": self.state.participants.user,
                 "chatbot_name": self.state.participants.chatbot,
@@ -186,8 +186,11 @@ class ChatGuide:
                 action = route.get('action', '')
                 self._log(f"Route fired: {action}")
                 if self._route_executor.execute(route):
-                    self._executed_routes.add(route_id)
+                    self.state.routes.mark_fired(route_id, self.state.conversation.turn_count)
                     break
+        
+        # Save route history after processing all routes
+        self.state.routes.save_turn_history()
     
     def _log(self, message: str):
         """Log message."""

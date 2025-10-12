@@ -10,12 +10,14 @@ class Conversation:
         conversation.memory = "New context"
         conversation.history.append({"role": "user", "text": "hi"})
         conversation.max_turns = 20
+        conversation.turn_count = 5
     """
     
     def __init__(self, max_turns: int = 10):
         self.memory: str = ""
         self.history: List[Dict[str, str]] = []
         self.max_turns: int = max_turns
+        self.turn_count: int = 0
     
     # Method with logic (auto-trimming)
     def add_message(self, role: str, text: str):
@@ -40,5 +42,6 @@ class Conversation:
         return {
             "memory": self.memory,
             "history": self.history.copy(),
-            "max_turns": self.max_turns
+            "max_turns": self.max_turns,
+            "turn_count": self.turn_count
         }

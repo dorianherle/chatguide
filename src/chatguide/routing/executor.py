@@ -1,4 +1,4 @@
-﻿"""Route action executor - mutates state via direct access or method calls."""
+"""Route action executor - mutates state via direct access or method calls."""
 
 
 class RouteExecutor:
@@ -13,7 +13,7 @@ class RouteExecutor:
         """Execute a route action.
         
         Supports two formats:
-        1. Direct field assignment: action="set", path="interaction.tones", value=[...]
+        1. Direct field assignment: action="set", path="tones.active", value=[...]
         2. Method calls: action="flow.advance", force=true
         """
         action = route.get("action")
@@ -44,11 +44,11 @@ class RouteExecutor:
         
         Example:
             action: "set"
-            path: "interaction.tones"
+            path: "tones.active"
             value: ["friendly", "playful"]
             
         Or with dynamic evaluation:
-            value: "task_results.get('get_name')"  # Will be evaluated
+            value: "tasks.results.get('get_name')"  # Will be evaluated
         """
         path = route.get("path", "")
         value = route.get("value")
@@ -61,15 +61,15 @@ class RouteExecutor:
             try:
                 eval_context = {
                     "__builtins__": {},
-                    "task_results": self.state.tracker.results,
-                    "turn_count": self.state.interaction.turn_count,
+                    "task_results": self.state.tasks.results,
+                    "turn_count": self.state.conversation.turn_count,
                     "batch_index": self.state.flow.current_index,
                 }
                 value = eval(value, eval_context)
             except Exception:
                 pass  # Keep original value if eval fails
         
-        # Parse path (e.g., "interaction.tones")
+        # Parse path (e.g., "tones.active")
         parts = path.split('.')
         obj = self.state
         
@@ -136,9 +136,10 @@ class RouteExecutor:
         """
         containers = {
             'flow': self.state.flow,
-            'tracker': self.state.tracker,
+            'tasks': self.state.tasks,
             'conversation': self.state.conversation,
-            'interaction': self.state.interaction,
+            'tones': self.state.tones,
+            'routes': self.state.routes,
             'participants': self.state.participants
         }
         
@@ -167,10 +168,10 @@ class RouteExecutor:
         Parses strings like:
             "update: get_name = John, update: get_age = 32"
         
-        And updates tracker.results accordingly.
+        And updates tasks.results accordingly.
         Note: History name updates happen via the separate route that sets participants.user.
         """
-        correction_text = self.state.tracker.results.get('detect_info_updates', '')
+        correction_text = self.state.tasks.results.get('detect_info_updates', '')
         if not correction_text or 'update:' not in correction_text:
             return False
         
@@ -192,9 +193,9 @@ class RouteExecutor:
                 task_id = task_id.strip()
                 value = value.strip().rstrip(',')  # Remove trailing comma too
                 
-                # Update the tracker
-                old_value = self.state.tracker.results.get(task_id, "NOT_SET")
-                self.state.tracker.results[task_id] = value
+                # Update tasks.results
+                old_value = self.state.tasks.results.get(task_id, "NOT_SET")
+                self.state.tasks.results[task_id] = value
                 
                 if self.state.debug:
                     print(f"Correction applied: {task_id} '{old_value}' -> '{value}'", flush=True)

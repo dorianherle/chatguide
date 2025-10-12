@@ -130,7 +130,7 @@ def main():
         st.header("🧠 What Sol knows about you")
         
         debug_info = st.session_state.chat_service.get_debug_info()
-        task_results = debug_info['tracker']['results']
+        task_results = debug_info['tasks']['results']
         
         if task_results:
             # Filter out system tasks
@@ -194,7 +194,7 @@ def main():
             st.info("Sol is getting to know you... 🤗")
         
         st.divider()
-        st.caption(f"Turn: {debug_info['interaction']['turn_count']} | Phase: {debug_info['flow']['current_index'] + 1}")
+        st.caption(f"Turn: {debug_info['conversation']['turn_count']} | Phase: {debug_info['flow']['current_index'] + 1}")
     
     # Visual divider between controls and chat
     st.divider()

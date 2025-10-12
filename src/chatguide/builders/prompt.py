@@ -1,4 +1,4 @@
-﻿"""Prompt builder - assembles LLM prompts."""
+"""Prompt builder - assembles LLM prompts."""
 
 from typing import List
 
@@ -61,10 +61,10 @@ CRITICAL RULES:
         """Format memory with task results."""
         parts = [self.state.conversation.memory]
         
-        if self.state.tracker.results:
+        if self.state.tasks.results:
             info_lines = [
                 f"- {tid}: {res}"
-                for tid, res in self.state.tracker.results.items()
+                for tid, res in self.state.tasks.results.items()
                 if res and tid not in ["detect_info_updates", "introduce_yourself"]
             ]
             if info_lines:
@@ -110,7 +110,7 @@ CRITICAL RULES:
         """Format active tones."""
         instructions = [
             self.config.tones.get(t, t) 
-            for t in self.state.interaction.tones
+            for t in self.state.tones.active
         ]
         return " ".join(instructions)
     

@@ -3,7 +3,7 @@
 from typing import List
 
 
-class TaskFlow:
+class Flow:
     """Task batches and navigation.
     
     All attributes are directly editable:
