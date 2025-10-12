@@ -20,55 +20,90 @@ Most AI frameworks are built for RAG pipelines or autonomous agents. ChatGuide i
 
 ## ⚡ Quick Start
 
-Let's build a simple tech support bot that collects user information and adapts its behavior dynamically.
+Let's build a simple tech support bot **step-by-step**. You'll learn how ChatGuide works by seeing each piece in action.
 
-### Step 1: Create your config file
+**What we're building:** A bot that collects user info, detects their mood, and adapts its tone automatically.
+
+---
+
+### Step 1: Understand the Config File
+
+The config file is where you tell ChatGuide **what** to collect, **how** to speak, and **when** to adapt.
 
 Create `config.yaml`:
 
 ```yaml
-# What information to collect
+# ════════════════════════════════════════════════════════════════
+# TASKS: What information to collect
+# ════════════════════════════════════════════════════════════════
+# Format: task_name: "type, description"
+# Types: string (text), int (number), enum (choose from list)
+
 tasks:
+  # Information gathering
   get_name: "string, Ask for the user's name"
   get_age: "int, Ask for the user's age"
   get_issue: "string, Ask what problem they're experiencing"
+  
+  # AI assessment (computed by the LLM)
   assess_severity: "enum, Determine severity. Choose: low, medium, critical"
+  
+  # Persistent monitoring (runs every turn)
   monitor_mood: "enum, Detect user mood. Choose: happy, frustrated, neutral"
+  
+  # System task (handles corrections)
   detect_info_updates: "Check if user corrects previous info. Format: 'update: task_id = value' or empty string"
 
-# How the AI should speak
+# ════════════════════════════════════════════════════════════════
+# TONES: How the AI speaks
+# ════════════════════════════════════════════════════════════════
+
 tones:
   helpful: "Be clear, friendly, and solution-focused"
   urgent: "Be direct and prioritize quick resolution"
   empathetic: "Be understanding and supportive"
 
-# What the AI should never do
+# ════════════════════════════════════════════════════════════════
+# GUARDRAILS: Rules the AI must always follow
+# ════════════════════════════════════════════════════════════════
+
 guardrails: "Stay focused on current tasks. If user goes off-topic, gently redirect."
 
-# Dynamic behavior rules
+# ════════════════════════════════════════════════════════════════
+# ROUTES: When to change behavior
+# ════════════════════════════════════════════════════════════════
+# Format: condition → action
+
 routes:
-  # If issue is critical, switch to urgent tone
+  # Critical issue detected → switch to urgent tone
   - condition: "task_results.get('assess_severity') == 'critical'"
-    action: "interaction.set_tones"
+    action: "tones.set_tones"
     tones: ["urgent", "empathetic"]
   
-  # If user is frustrated, be more empathetic
+  # User frustrated → be empathetic
   - condition: "task_results.get('monitor_mood') == 'frustrated'"
-    action: "interaction.set_tones"
+    action: "tones.set_tones"
     tones: ["empathetic"]
   
-  # Process user corrections
+  # User corrects info → apply correction
   - condition: "'update:' in task_results.get('detect_info_updates', '')"
     action: "process_corrections"
   
-  # Update user name dynamically
+  # Name detected → update display name in history
   - condition: "task_results.get('get_name') and task_results.get('get_name') != user_name"
     action: "set"
     path: "participants.user"
     value: "task_results.get('get_name')"
 ```
 
-### Step 2: Write your conversation script
+**💡 What did we just define?**
+- **6 tasks** the bot needs to complete (3 info gathering + 3 monitoring)
+- **3 tones** the bot can use (helpful, urgent, empathetic)
+- **4 routes** that make the bot adaptive (severity, mood, corrections, name updates)
+
+### Step 2: Write Your Conversation Script
+
+Now we'll wire everything together with code. Each section is explained inline.
 
 Create `main.py`:
 
@@ -76,57 +111,89 @@ Create `main.py`:
 from chatguide import ChatGuide
 import os
 
-# Initialize with debug mode to see what's happening
-guide = ChatGuide(debug=True)
+# ════════════════════════════════════════════════════════════════
+# INITIALIZE: Create the ChatGuide instance
+# ════════════════════════════════════════════════════════════════
 
-# Load the config file
+guide = ChatGuide(debug=True)  # debug=True shows what's happening
+
+# Load the config file we just created
 guide.load_config("config.yaml")
 
-# Define the conversation flow (what order to collect information)
+# ════════════════════════════════════════════════════════════════
+# DEFINE FLOW: What order to collect information
+# ════════════════════════════════════════════════════════════════
+
 guide.set_flow(
     batches=[
-        ["get_name", "get_age"],           # Batch 0: Collect basic info first
-        ["get_issue"],                     # Batch 1: Then ask about the problem
-        ["assess_severity"],               # Batch 2: Finally assess severity
+        # Batch 0: Start with basics (both must complete before advancing)
+        ["get_name", "get_age"],
+        
+        # Batch 1: Then ask about the problem
+        ["get_issue"],
+        
+        # Batch 2: Finally assess severity
+        ["assess_severity"],
     ],
-    persistent=["monitor_mood", "detect_info_updates"]  # These run EVERY turn
+    
+    # These tasks run EVERY turn (not just in one batch)
+    persistent=["monitor_mood", "detect_info_updates"]
 )
 
-# Start the conversation
+# ════════════════════════════════════════════════════════════════
+# START: Begin the conversation
+# ════════════════════════════════════════════════════════════════
+
 guide.start(
     memory="You're a friendly tech support assistant helping users troubleshoot issues.",
-    tones=["helpful"]  # Start with helpful tone
+    tones=["helpful"]  # Start with the "helpful" tone
 )
 
-print("Tech Support Bot initialized! Type your messages below.\n")
+print("Tech Support Bot initialized! 🤖\n")
 
-# Chat loop - continues until all batches are complete
+# ════════════════════════════════════════════════════════════════
+# CHAT LOOP: Keep talking until all batches complete
+# ════════════════════════════════════════════════════════════════
+
 while not guide.state.flow.is_finished():
     user_input = input("You: ")
     
-    # Add user's message to conversation history
+    # 1. Add user's message to history
     guide.add_user_message(user_input)
     
-    # Get AI response
+    # 2. Get AI response (this is where the magic happens!)
     reply = guide.chat(
         model="gemini/gemini-2.5-flash-lite",
         api_key=os.getenv("GEMINI_API_KEY")
     )
     
+    # 3. Show the response
     print(f"Bot: {reply.assistant_reply}")
+    
+    # 4. Debug info (optional)
+    if guide.debug:
+        batch = guide.state.flow.current_index
+        print(f"[Batch {batch}/3 | Mood: {guide.state.tasks.results.get('monitor_mood', '?')}]\n")
 
-    # Optional: Show what batch we're on
-    current_batch = guide.state.flow.current_index
-    print(f"[Debug: Batch {current_batch}]\n")
+# ════════════════════════════════════════════════════════════════
+# DONE: Show what we collected
+# ════════════════════════════════════════════════════════════════
 
-# Conversation finished - show collected information
-print("\n=== Session Summary ===")
-results = guide.state.tracker.results
-print(f"Name: {results.get('get_name')}")
-print(f"Age: {results.get('get_age')}")
-print(f"Issue: {results.get('get_issue')}")
+print("\n=== Session Complete ===")
+results = guide.state.tasks.results
+print(f"Name:     {results.get('get_name')}")
+print(f"Age:      {results.get('get_age')}")
+print(f"Issue:    {results.get('get_issue')}")
 print(f"Severity: {results.get('assess_severity')}")
 ```
+
+**💡 What's happening here?**
+
+1. **Load config** → ChatGuide knows what tasks/tones/routes exist
+2. **Set flow** → Defines the order: basics → issue → severity
+3. **Start** → Gives the bot context and initial tone
+4. **Loop** → Each turn: user input → AI response → update state
+5. **Results** → Access all collected info via `state.tasks.results`
 
 ### Step 3: Set up environment
 
@@ -207,25 +274,23 @@ state = ConversationState(
 )
 ```
 
-**What each container holds:**
+**Container Details:**
 
-| Container | Fields | Purpose |
-|-----------|--------|---------|
-| `conversation` | `memory`, `history`, `max_turns`, `turn_count` | Context, message history, global turn counter |
-| `flow` | `batches`, `current_index`, `persistent` | Task progression logic |
-| `tasks` | `results`, `status`, `attempts` | Task outcomes + per-task attempt counts |
-| `tones` | `active` | Active tone list |
-| `routes` | `fired_this_turn`, `fired_history`, `last_fired`, `executed_once` | Route execution tracking |
-| `participants` | `user`, `chatbot` | Display names (dynamically resolved) |
+| Container | What It Holds | Example Access |
+|-----------|---------------|----------------|
+| **`conversation`** | Memory context, message history, turn counter | `state.conversation.memory = "You're a support bot"`<br>`state.conversation.turn_count = 5`<br>`state.conversation.history` → list of messages |
+| **`flow`** | Task batches, current position, persistent tasks | `state.flow.current_index` → current batch number<br>`state.flow.batches` → all task batches<br>`state.flow.persistent` → always-active tasks |
+| **`tasks`** | Results, status, attempt counts per task | `state.tasks.results["get_name"]` → "John"<br>`state.tasks.status["get_name"]` → "completed"<br>`state.tasks.attempts["get_name"]` → 1 |
+| **`tones`** | Active tone list | `state.tones.active` → `["friendly", "empathetic"]`<br>`state.tones.set_tones(["urgent"])` |
+| **`routes`** | Which routes fired and when | `state.routes.fired_this_turn` → `["route_0"]`<br>`state.routes.last_fired["route_0"]` → 5 |
+| **`participants`** | User and chatbot names (dynamic) | `state.participants.user` → "John"<br>`state.participants.chatbot` → "Sol" |
 
-Each container is **directly mutable**—no hidden setters:
-```python
-guide.state.conversation.memory = "Updated context"
-guide.state.conversation.turn_count = 5
-guide.state.tones.active = ["empathetic", "urgent"]
-guide.state.tasks.results["get_name"] = "John"
-guide.state.participants.user = "John"
-```
+**Key Design Principles:**
+
+1. **Direct Mutation** – No getters/setters, just modify attributes directly
+2. **Separation of Concerns** – Each container has one clear responsibility  
+3. **Full Observability** – All state is serializable via `state.to_dict()`
+4. **Consistent Naming** – Variable name = class name (lowercase)
 
 ### 2. **Task Flow** – Sequential Progression
 
@@ -515,73 +580,6 @@ Get your Gemini API key: https://aistudio.google.com/app/apikey
 
 ---
 
-## 🎨 Real-World Example: Immigrant Support Bot
-
-```python
-from chatguide import ChatGuide
-import os
-
-guide = ChatGuide(debug=True)
-guide.load_config("config.yaml")
-
-# Progressive understanding flow
-guide.set_flow(
-    batches=[
-        ["introduce_yourself"],
-        ["get_name", "get_age", "get_origin"],
-        ["get_location", "get_move_date", "get_move_reason"],
-        ["get_language_level"],
-        ["get_social_network", "get_adaptation_level"],
-        ["get_biggest_challenge", "get_support_system"],
-        ["get_stay_duration", "get_primary_goal"]
-    ],
-    persistent=["get_emotion", "detect_info_updates"]
-)
-
-# Start
-guide.state.participants.chatbot = "Sol"
-guide.start(
-    memory="You are Sol, a friendly AI helping people who moved to a new country.",
-    tones=["neutral"]
-)
-
-# Run
-while not guide.state.flow.is_finished():
-    user_input = input("\nYou: ")
-    guide.add_user_message(user_input)
-    
-    reply = guide.chat(
-        model="gemini/gemini-2.5-flash-lite",
-        api_key=os.getenv("GEMINI_API_KEY")
-    )
-    
-    print(f"\n{guide.state.participants.chatbot}: {reply.assistant_reply}")
-
-# Generate support profile
-profile = {
-    "name": guide.state.tracker.results.get("get_name"),
-    "age": guide.state.tracker.results.get("get_age"),
-    "from": guide.state.tracker.results.get("get_origin"),
-    "current_location": guide.state.tracker.results.get("get_location"),
-    "language_level": guide.state.tracker.results.get("get_language_level"),
-    "biggest_challenge": guide.state.tracker.results.get("get_biggest_challenge"),
-    "goal": guide.state.tracker.results.get("get_primary_goal")
-}
-
-print("\n=== Support Profile ===")
-for key, value in profile.items():
-    print(f"{key}: {value}")
-```
-
-**What makes this work:**
-
-1. **Dynamic name resolution** – If user corrects their name mid-conversation, all history updates automatically
-2. **Emotion-aware routing** – Tone adapts based on detected emotion
-3. **Progressive disclosure** – Information collected in natural batches
-4. **Correction detection** – `detect_info_updates` catches and applies corrections in real-time
-
----
-
 ## 🔧 Configuration Reference
 
 ### Route Condition Variables
@@ -773,32 +771,3 @@ class TaskResult:
 ```
 
 ---
-
-## 🤝 Contributing
-
-ChatGuide prioritizes **simplicity** and **clarity**. Contributions should:
-
-1. Maintain single-responsibility principle
-2. Avoid new dependencies unless critical
-3. Include clear documentation
-4. Not break existing APIs
-
----
-
-## 📜 License
-
-MIT License – use it however you want.
-
----
-
-## 🙏 Why ChatGuide Exists
-
-Most AI frameworks are built for RAG pipelines or autonomous agents. When you need a **guided conversation**—where you know what information to collect but want natural dialogue—you end up fighting the framework.
-
-ChatGuide is built specifically for this use case. No more, no less.
-
-**Built for developers who want:**
-- Clean, readable code they can understand
-- Predictable, debuggable behavior
-- Minimal dependencies
-- Goal-oriented conversations that actually work
