@@ -1,3 +1,0 @@
-streamlit
-python-dotenv>=1.0.0
-git+https://github.com/yourusername/chatguide.git
