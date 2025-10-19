@@ -1,170 +1,152 @@
-"""Prompt builder - assembles LLM prompts."""
+"""Prompt builder - assembles LLM prompts from state."""
 
 from typing import List, Dict, Any
 import yaml
 from pathlib import Path
 
-from ..core.config import Config
-from ..core.state import ConversationState
-
 
 class PromptBuilder:
     """Builds prompts from config and state."""
     
-    # Cache for core prompt templates
-    _core_prompts: Dict[str, Dict[str, Any]] = None
+    # Cache for language templates
+    _lang_templates: Dict[str, Dict[str, Any]] = None
     
-    def __init__(self, config: Config, state: ConversationState):
-        self.config = config
+    def __init__(self, state: "State", plan: "Plan", tasks: Dict[str, "TaskDefinition"],
+                 tone: List[str], tone_definitions: Dict[str, str], 
+                 guardrails: str, conversation_history: List[Dict[str, str]],
+                 language: str = "en"):
         self.state = state
+        self.plan = plan
+        self.tasks = tasks
+        self.tone = tone
+        self.tone_definitions = tone_definitions
+        self.guardrails = guardrails
+        self.conversation_history = conversation_history
+        self.language = language
         
-        # Load core prompts on first use
-        if PromptBuilder._core_prompts is None:
-            PromptBuilder._load_core_prompts()
+        # Load language templates on first use
+        if PromptBuilder._lang_templates is None:
+            PromptBuilder._load_language_templates()
     
     @classmethod
-    def _load_core_prompts(cls):
-        """Load core prompt templates from YAML."""
-        core_prompt_path = Path(__file__).parent.parent / "core" / "core_prompt.yaml"
-        with open(core_prompt_path, 'r', encoding='utf-8') as f:
-            cls._core_prompts = yaml.safe_load(f)
+    def _load_language_templates(cls):
+        """Load language templates from YAML."""
+        template_path = Path(__file__).parent.parent / "core" / "core_prompt.yaml"
+        with open(template_path, 'r', encoding='utf-8') as f:
+            cls._lang_templates = yaml.safe_load(f)
     
-    def _get_template(self) -> Dict[str, Any]:
-        """Get template for current language, fallback to English."""
-        lang = self.state.language
-        return self._core_prompts.get(lang, self._core_prompts['en'])
+    def _get_lang(self, key: str, default: str = "") -> str:
+        """Get language-specific text, fallback to English."""
+        lang_data = self._lang_templates.get(self.language, self._lang_templates.get("en", {}))
+        return lang_data.get(key, default)
     
     def build(self) -> str:
         """Build complete prompt with language support."""
-        t = self._get_template()
+        current_tasks = self.plan.get_current_block()
         
-        # Format critical rules
-        rules = "\n".join([f"{i+1}. {rule}" for i, rule in enumerate(t['critical_rules'])])
-        rules = rules.replace("{count}", str(len(self.state.get_persistent_tasks())))
-        
-        return f'''
-{t['language_instruction']}
+        return f'''{self._get_lang("language_instruction", "Speak naturally.")}
 
-{t['memory_header']}
-{self._format_memory()}
-
-{t['chat_history_header']}
+{self._get_lang("chat_history_header", "CONVERSATION HISTORY:")}
 {self._format_history()}
 
-{t['guardrails_header']}
-{self.config.guardrails}
+{self._get_lang("current_state_header", "CURRENT STATE:")}
+{self._format_state()}
 
-{t['current_tasks_header']}
-{self._format_tasks(self.state.get_current_tasks())}
+{self._get_lang("guardrails_header", "GUARDRAILS:")}
+{self.guardrails}
 
-{t['persistent_tasks_header']}
-{self._format_tasks(self.state.get_persistent_tasks())}
+{self._get_lang("current_tasks_header", "CURRENT TASKS:")}
+{self._format_tasks(current_tasks)}
 
-{t['next_tasks_header']}
-{self._format_next_tasks()}
+{self._get_lang("tone_header", "TONE:")}
+{self._format_tone()}
 
-{t['tone_header']} {self._format_tone()}
-
-{t['output_format_header']}
+{self._get_lang("output_format_header", "OUTPUT FORMAT:")}
+Respond with JSON matching this schema:
 {{
-  "tasks": [
+  "assistant_reply": "Your natural response to the user",
+  "task_results": [
     {{
       "task_id": "task_name",
-      "result": "output_value"
+      "key": "state_variable_name",
+      "value": "extracted_value"
     }}
   ],
-  "persistent_tasks": [
-{self._format_persistent_output()}
-  ],
-  "assistant_reply": "your_response_here"
+  "tools": [
+    {{
+      "tool": "tool_id",
+      "options": ["option1", "option2"]  // if tool needs options
+    }}
+  ]
 }}
 
-{t['critical_rules_header']}
-{rules}
+CRITICAL RULES:
+1. Respond naturally in assistant_reply
+2. Each task_result extracts ONE piece of data: task_id, key (state variable), value
+3. Only include tools if explicitly defined in current task
+4. STRICTLY follow the tone guidelines above - they define how you should speak
+5. If tone says "excited" or "exclamation marks", you MUST use them!
 
 ==============================================================================='''.strip()
     
-    def _format_memory(self) -> str:
-        """Format memory with task results."""
-        parts = [self.state.conversation.memory]
-        
-        if self.state.tasks.results:
-            info_lines = [
-                f"- {tid}: {res}"
-                for tid, res in self.state.tasks.results.items()
-                if res and tid not in ["detect_info_updates", "introduce_yourself"]
-            ]
-            if info_lines:
-                parts.append("Known info:\n" + "\n".join(info_lines))
-        
-        return "\n".join(parts)
-    
     def _format_history(self) -> str:
-        """Format recent chat history with dynamic name resolution."""
-        history = self.state.conversation.get_recent_history()
-        formatted = []
-        for msg in history:
-            role = msg["role"]
-            text = msg["text"]
-            # Resolve current participant names dynamically
-            if role == self.state.participants.user or role == "user":
-                role = self.state.participants.user
-            elif role == self.state.participants.chatbot or role == "assistant":
-                role = self.state.participants.chatbot
-            formatted.append(f"{role}: {text}")
-        return "\n".join(formatted)
-    
-    def _format_tasks(self, task_ids: List[str]) -> str:
-        """Format task list with descriptions."""
-        if not task_ids:
-            t = self._get_template()
-            return t['none']
+        """Format conversation history."""
+        if not self.conversation_history:
+            return self._get_lang("none", "(No messages yet)")
         
         lines = []
-        for tid in task_ids:
-            desc = self.config.get_task_description(tid)
-            lines.append(f"{tid}: {desc}")
+        for msg in self.conversation_history[-10:]:  # Last 10 messages
+            role = msg.get("role", "unknown")
+            content = msg.get("content", "")
+            lines.append(f"{role}: {content}")
         
         return "\n".join(lines)
     
-    def _format_next_tasks(self) -> str:
-        """Format next batch."""
-        next_batch = self.state.flow.get_next_batch()
-        if not next_batch:
-            t = self._get_template()
-            return t['no_next_tasks']
-        return self._format_tasks(next_batch)
+    def _format_state(self) -> str:
+        """Format current state."""
+        state_dict = self.state.to_dict()
+        if not state_dict:
+            return self._get_lang("none", "(Empty)")
+        
+        lines = []
+        for key, value in state_dict.items():
+            lines.append(f"- {key}: {value}")
+        
+        return "\n".join(lines)
+    
+    def _format_tasks(self, task_ids: List[str]) -> str:
+        """Format task list with descriptions and tools."""
+        if not task_ids:
+            return self._get_lang("none", "(None)")
+        
+        lines = []
+        for task_id in task_ids:
+            task = self.tasks.get(task_id)
+            if not task:
+                continue
+            
+            lines.append(f"\nTask: {task_id}")
+            lines.append(f"Description: {task.description}")
+            
+            if task.expects:
+                lines.append(f"Expected to collect: {', '.join(task.expects)}")
+            
+            if task.tools:
+                lines.append("Available tools:")
+                for tool_def in task.tools:
+                    tool_id = tool_def.get("tool", "unknown")
+                    lines.append(f"  - {tool_id}")
+        
+        return "\n".join(lines)
     
     def _format_tone(self) -> str:
         """Format active tones."""
-        instructions = [
-            self.config.tones.get(t, t) 
-            for t in self.state.tones.active
-        ]
-        return " ".join(instructions)
-    
-    def _format_persistent_output(self) -> str:
-        """Format persistent tasks for OUTPUT FORMAT example.
+        if not self.tone:
+            return "Natural and helpful"
         
-        Dynamically builds the example based on active persistent tasks.
-        """
-        persistent = self.state.get_persistent_tasks()
-        if not persistent:
-            return ""
+        descriptions = []
+        for tone_id in self.tone:
+            desc = self.tone_definitions.get(tone_id, tone_id)
+            descriptions.append(desc)
         
-        lines = []
-        for i, task_id in enumerate(persistent):
-            desc = self.config.get_task_description(task_id)
-            # Extract hint from description if available
-            hint = "result_value"
-            if "Choose:" in desc:
-                # Enum task - show options
-                hint = desc.split("Choose:")[1].split(",")[0].strip() + "..."
-            elif task_id == "detect_info_updates":
-                hint = "update: task_id = value OR empty_string"
-            
-            comma = "," if i < len(persistent) - 1 else ""
-            lines.append(f'    {{\n      "task_id": "{task_id}",\n      "result": "{hint}"\n    }}{comma}')
-        
-        return "\n".join(lines)
-    
+        return " ".join(descriptions)

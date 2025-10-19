@@ -1,23 +1,32 @@
-﻿"""Pydantic schemas for ChatGuide data structures."""
+﻿"""Pydantic schemas for ChatGuide."""
 
-from pydantic import BaseModel
-from typing import List
+from pydantic import BaseModel, Field
+from typing import List, Dict, Any, Optional
 
 
-class Task(BaseModel):
-    """Task definition."""
-    key: str
+class TaskDefinition(BaseModel):
+    """Task definition from config."""
     description: str
+    expects: List[str] = []
+    tools: List[Dict[str, Any]] = []
+    silent: bool = False  # If True, don't show assistant_reply (just collect state)
+
+
+class ToolCall(BaseModel):
+    """Tool invocation from LLM."""
+    tool: str
+    options: Optional[List[str]] = None
 
 
 class TaskResult(BaseModel):
-    """Result from a completed task."""
+    """Task execution result from LLM."""
     task_id: str
-    result: str
+    key: str
+    value: str
 
 
 class ChatGuideReply(BaseModel):
     """LLM response envelope."""
-    tasks: List[TaskResult]
-    persistent_tasks: List[TaskResult] = []
     assistant_reply: str
+    task_results: List[TaskResult] = []
+    tools: List[ToolCall] = []

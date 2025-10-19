@@ -1,0 +1,16 @@
+<!-- Button Choice Component -->
+<div style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+    <p style="margin-bottom: 12px; font-weight: 500; color: #333;">{{label}}</p>
+    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        {% for option in options %}
+        <button 
+            onclick="selectOption('{{option}}')" 
+            style="padding: 10px 20px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; transition: all 0.3s;"
+            onmouseover="this.style.background='#45a049'" 
+            onmouseout="this.style.background='#4CAF50'">
+            {{option}}
+        </button>
+        {% endfor %}
+    </div>
+</div>
+

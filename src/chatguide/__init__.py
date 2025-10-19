@@ -1,17 +1,35 @@
-﻿"""ChatGuide - The lightweight framework for guided conversational AI."""
+﻿"""ChatGuide - State-driven conversational agent framework."""
 
-__version__ = "2.0.0"
-
-from .schemas import Task, TaskResult, ChatGuideReply
-from .core.state import ConversationState
 from .chatguide import ChatGuide
-from .utils.debug_formatter import DebugFormatter
+from .state import State
+from .plan import Plan
+from .adjustments import Adjustments, Adjustment
+from .tool_executor import register_tool, get_tool_registry
+from .schemas import ChatGuideReply, TaskDefinition, ToolCall, TaskResult
+
+# Register built-in HTML tools
+register_tool(
+    "html.button_choice",
+    "ui",
+    "Display clickable button options for user to choose from"
+)
+
+register_tool(
+    "html.card_swipe",
+    "ui",
+    "Display animated credit card swipe for payment processing"
+)
 
 __all__ = [
     "ChatGuide",
-    "ConversationState",
-    "Task",
-    "TaskResult",
+    "State",
+    "Plan",
+    "Adjustments",
+    "Adjustment",
+    "register_tool",
+    "get_tool_registry",
     "ChatGuideReply",
-    "DebugFormatter",
+    "TaskDefinition",
+    "ToolCall",
+    "TaskResult"
 ]
