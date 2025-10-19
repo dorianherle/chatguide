@@ -63,6 +63,10 @@ class ChatGuide:
         
         self._log(f"Loaded config from {path}")
     
+    def set_language(self, language: str):
+        """Set conversation language (ISO 639-1 code)."""
+        self.state.language = language
+    
     def set_flow(self, batches: List[List[str]], persistent: List[str] = None):
         """Set task flow."""
         self.state.flow.set_flow(batches, persistent)

@@ -238,7 +238,7 @@ def main():
             
             # Beautiful debug output to console
             import sys
-            from src.chatguide import ChatGuide
+            from chatguide import ChatGuide
             
             # Force flush to ensure output appears
             print("\n" + "="*70, file=sys.stderr, flush=True)

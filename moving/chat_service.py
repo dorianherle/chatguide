@@ -3,7 +3,7 @@
 import os
 from pathlib import Path
 from dotenv import load_dotenv
-from src.chatguide import ChatGuide
+from chatguide import ChatGuide
 
 load_dotenv()
 
@@ -21,7 +21,10 @@ class ChatService:
         config_path = Path(__file__).parent / "config.yaml"
         self.guide.load_config(str(config_path))
         
-        # Language names
+        # Set language (this will affect the entire prompt)
+        self.guide.set_language(language)
+        
+        # Language names (for intro task substitution)
         language_names = {
             "en": "English",
             "es": "Spanish", 

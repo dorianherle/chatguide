@@ -1,6 +1,8 @@
 """Prompt builder - assembles LLM prompts."""
 
-from typing import List
+from typing import List, Dict, Any
+import yaml
+from pathlib import Path
 
 from ..core.config import Config
 from ..core.state import ConversationState
@@ -9,34 +11,61 @@ from ..core.state import ConversationState
 class PromptBuilder:
     """Builds prompts from config and state."""
     
+    # Cache for core prompt templates
+    _core_prompts: Dict[str, Dict[str, Any]] = None
+    
     def __init__(self, config: Config, state: ConversationState):
         self.config = config
         self.state = state
+        
+        # Load core prompts on first use
+        if PromptBuilder._core_prompts is None:
+            PromptBuilder._load_core_prompts()
+    
+    @classmethod
+    def _load_core_prompts(cls):
+        """Load core prompt templates from YAML."""
+        core_prompt_path = Path(__file__).parent.parent / "core" / "core_prompt.yaml"
+        with open(core_prompt_path, 'r', encoding='utf-8') as f:
+            cls._core_prompts = yaml.safe_load(f)
+    
+    def _get_template(self) -> Dict[str, Any]:
+        """Get template for current language, fallback to English."""
+        lang = self.state.language
+        return self._core_prompts.get(lang, self._core_prompts['en'])
     
     def build(self) -> str:
-        """Build complete prompt."""
+        """Build complete prompt with language support."""
+        t = self._get_template()
+        
+        # Format critical rules
+        rules = "\n".join([f"{i+1}. {rule}" for i, rule in enumerate(t['critical_rules'])])
+        rules = rules.replace("{count}", str(len(self.state.get_persistent_tasks())))
+        
         return f'''
-MEMORY:
+{t['language_instruction']}
+
+{t['memory_header']}
 {self._format_memory()}
 
-CHAT HISTORY:
+{t['chat_history_header']}
 {self._format_history()}
 
-GUARDRAILS:
+{t['guardrails_header']}
 {self.config.guardrails}
 
-CURRENT TASKS:
+{t['current_tasks_header']}
 {self._format_tasks(self.state.get_current_tasks())}
 
-PERSISTENT TASKS (MUST return ALL in EVERY response):
+{t['persistent_tasks_header']}
 {self._format_tasks(self.state.get_persistent_tasks())}
 
-NEXT TASKS:
+{t['next_tasks_header']}
 {self._format_next_tasks()}
 
-TONE: {self._format_tone()}
+{t['tone_header']} {self._format_tone()}
 
-OUTPUT FORMAT:
+{t['output_format_header']}
 {{
   "tasks": [
     {{
@@ -50,10 +79,8 @@ OUTPUT FORMAT:
   "assistant_reply": "your_response_here"
 }}
 
-CRITICAL RULES:
-1. ALWAYS return ALL {len(self.state.get_persistent_tasks())} persistent tasks in EVERY response
-2. Once all CURRENT TASKS are completed, IMMEDIATELY advance to NEXT TASKS
-3. Return empty string for tasks not completed
+{t['critical_rules_header']}
+{rules}
 
 ==============================================================================='''.strip()
     
@@ -90,7 +117,8 @@ CRITICAL RULES:
     def _format_tasks(self, task_ids: List[str]) -> str:
         """Format task list with descriptions."""
         if not task_ids:
-            return "None"
+            t = self._get_template()
+            return t['none']
         
         lines = []
         for tid in task_ids:
@@ -103,7 +131,8 @@ CRITICAL RULES:
         """Format next batch."""
         next_batch = self.state.flow.get_next_batch()
         if not next_batch:
-            return "No next tasks"
+            t = self._get_template()
+            return t['no_next_tasks']
         return self._format_tasks(next_batch)
     
     def _format_tone(self) -> str:
@@ -138,3 +167,4 @@ CRITICAL RULES:
             lines.append(f'    {{\n      "task_id": "{task_id}",\n      "result": "{hint}"\n    }}{comma}')
         
         return "\n".join(lines)
+    

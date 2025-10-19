@@ -25,6 +25,9 @@ class ConversationState:
         self.routes = Routes()
         self.participants = Participants()
         
+        # Language
+        self.language = "en"  # ISO 639-1 code
+        
         self.debug = debug
     
     # Convenience helpers (common queries)
@@ -54,6 +57,9 @@ class ConversationState:
             "tones": self.tones.to_dict(),
             "routes": self.routes.to_dict(),
             "participants": self.participants.to_dict(),
+            
+            # Language
+            "language": self.language,
             
             # Convenience fields (for debugging/display)
             "current_tasks": self.get_current_tasks(),

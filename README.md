@@ -26,6 +26,37 @@ Most AI frameworks are built for RAG pipelines or autonomous agents. ChatGuide i
 
 ---
 
+## 🌍 Multilingual Support
+
+ChatGuide provides **full multilingual support** with localized prompts and grammar-aware responses:
+
+**Supported Languages:**
+- 🇺🇸 **English** - Full native support
+- 🇪🇸 **Spanish (Español)** - Complete localization
+- 🇫🇷 **French (Français)** - Complete localization  
+- 🇩🇪 **German (Deutsch)** - Complete localization with case-aware grammar
+- 🇮🇹 **Italian (Italiano)** - Complete localization
+- 🇵🇹 **Portuguese (Português)** - Complete localization
+- 🇨🇳 **Chinese (中文)** - Complete localization
+- 🇯🇵 **Japanese (日本語)** - Complete localization
+- 🇰🇷 **Korean (한국어)** - Complete localization
+
+**Key Features:**
+- **Fully localized prompts** – All system instructions, headers, and rules translated
+- **Grammar-aware responses** – Language-specific grammar rules (e.g., German case system)
+- **Natural expressions** – Culturally appropriate phrasing for each language
+- **Easy language switching** – Set language with `guide.set_language("es")`
+- **Centralized translations** – All languages in `src/chatguide/core/core_prompt.yaml`
+
+```python
+# Set conversation language
+guide.set_language("de")  # German
+guide.set_language("fr")  # French
+guide.set_language("ja")  # Japanese
+```
+
+---
+
 ## ⚡ Quick Start
 
 Let's build a simple tech support bot **step-by-step**. You'll learn how ChatGuide works by seeing each piece in action.
