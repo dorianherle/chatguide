@@ -55,12 +55,12 @@ cp .env.example .env
 ### 3. Run Demo
 
 ```bash
-streamlit run app.py
+streamlit run examples/streamlit_demo.py
 ```
 
-Or test in terminal:
+Or run tests:
 ```bash
-python test_recognize_adjustment.py
+pytest tests/
 ```
 
 ## Core Concepts
@@ -350,36 +350,51 @@ print(f"LLM calls: {metrics['llm_calls']}, Success rate: {metrics['success_rate'
 
 ```
 chatguide/
-├── src/chatguide/
-│   ├── state.py              # Flat state + templates
-│   ├── plan.py               # Plan manipulation
-│   ├── adjustments.py        # Reactive rules
-│   ├── tool_executor.py      # Tool execution
-│   ├── schemas.py            # Pydantic models
-│   ├── chatguide.py          # Main orchestrator
-│   ├── builders/
-│   │   └── prompt.py         # Prompt generation
-│   ├── io/
-│   │   └── llm.py            # LLM providers
-│   └── utils/
-│       └── config_loader.py  # YAML parsing
+├── src/chatguide/           # Main package
+│   ├── chatguide.py         # Main orchestrator
+│   ├── state.py             # State management
+│   ├── plan.py              # Flow control
+│   ├── adjustments.py       # Reactive rules
+│   ├── schemas.py           # Pydantic models
+│   ├── tool_executor.py     # Tool execution
+│   ├── builders/            # Prompt builders
+│   │   └── prompt.py
+│   ├── io/                  # LLM & storage
+│   │   ├── llm.py
+│   │   └── storage.py
+│   ├── tools/               # Tool implementations
+│   │   └── html/
+│   └── utils/               # Utilities
+│       ├── config_loader.py
+│       ├── logger.py
+│       └── response_parser.py
 │
-├── app.py                    # Streamlit demo
-├── realistic_hotel_config.yaml
-└── test_recognize_adjustment.py
+├── tests/                   # Test suite
+│   └── __init__.py
+│
+├── examples/                # Example implementations
+│   ├── streamlit_demo.py    # Interactive web UI
+│   └── hotel_config.yaml    # Example configuration
+│
+├── README.md                # Documentation
+├── .gitignore               # Git ignore rules
+└── pyproject.toml          # Package configuration
 ```
 
 ## Testing
 
 ```bash
-# Test adjustment system
-python test_recognize_adjustment.py
+# Run all tests
+pytest tests/
 
-# Test full flow
-python test_working.py
+# Run specific test
+pytest tests/test_state_inspection.py
 
-# Run Streamlit app
-streamlit run app.py
+# Run with coverage
+pytest --cov=chatguide tests/
+
+# Run Streamlit demo
+streamlit run examples/streamlit_demo.py
 ```
 
 ## Advanced Features
@@ -559,12 +574,20 @@ Language templates are in `src/chatguide/core/core_prompt.yaml`.
 
 ## Examples
 
-See `realistic_hotel_config.yaml` for a complete hotel receptionist example featuring:
+See `examples/` directory for complete implementations:
+
+### Hotel Receptionist (`examples/hotel_config.yaml`)
 - Multi-path conversation (check-in, check-out, inquiries)
 - Silent tasks for name extraction
 - Returning guest recognition
 - Tone changes based on state
 - UI tools (button choices, card swipe animation)
+
+### Interactive Demo (`examples/streamlit_demo.py`)
+```bash
+streamlit run examples/streamlit_demo.py
+```
+Full-featured web UI showcasing all ChatGuide capabilities.
 
 ## Professional Assessment
 
@@ -610,10 +633,8 @@ See `realistic_hotel_config.yaml` for a complete hotel receptionist example feat
 - Open-ended creative writing (no guided flow)
 - Multi-turn complex reasoning with tool loops (consider LangChain/AutoGPT)
 
-## License
-
-MIT
-
 ---
 
 **Built for production** - Professional state management, clean architecture, maximum clarity.
+
+**ChatGuide: Enterprise-grade conversational AI framework** 🏆
