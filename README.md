@@ -1,66 +1,81 @@
 # ChatGuide
 
-![ChatGuide](static/chatguide.png)
+![ChatGuide](src/chatguide/static/chatguide.png)
 
-**Production-grade conversational agent framework with professional state management**
+Build conversational AI that actually knows where it is in the conversation.
 
-A clean, declarative framework for building guided conversational AI where the LLM performs reasoning, the runtime executes tools, and reactive adjustments keep everything dynamic.
+ChatGuide manages your conversation flow and state so you can focus on building great experiences. Define your conversation in YAML, let the LLM handle language understanding, and get automatic progress tracking, session persistence, and real-time updates out of the box.
 
-## Why ChatGuide?
+## Quick Example
 
-### **10/10 Enterprise-Grade Framework** 🏆
+**Define your flow in YAML:**
+```yaml
+plan:
+  - [greet]
+  - [get_name, get_email]
+  - [confirm]
 
-- ✅ **Session Persistence** - Checkpoint/resume conversations at any point
-- ✅ **Real-Time Streaming** - Event callbacks for WebSocket/SSE integration
-- ✅ **Professional Logging** - Structured JSON/text logs with file output
-- ✅ **Metrics & Telemetry** - Track calls, tokens, timing, success rates
-- ✅ **Middleware System** - Extensible hooks for custom business logic
-- ✅ **Comprehensive State** - X-ray vision into execution with task metadata
-- ✅ **Declarative Config** - YAML-based, zero boilerplate
-- ✅ **Reactive Adjustments** - Dynamic flow control based on state
-- ✅ **Multi-Language** - 9 languages supported out of the box
-
-**Perfect for:** Customer service, onboarding, booking, form filling, troubleshooting, product configuration
-
-```
-┌─────────┐
-│  State  │ ← Central memory (flat dict)
-└────┬────┘
-     │
-┌────▼────┐    ┌──────────┐    ┌─────────────┐
-│  Plan   │───▶│  Tasks   │───▶│    Tools    │
-└─────────┘    └──────────┘    └─────────────┘
-     ▲              │                   │
-     │              ▼                   ▼
-┌────┴────────┐  ┌─────────────────────┴─┐
-│ Adjustments │  │   Update State        │
-└─────────────┘  └───────────────────────┘
+tasks:
+  greet:
+    description: "Welcome the user warmly"
+  
+  get_name:
+    description: "Ask for and extract the user's name"
+    expects: ["user_name"]
+  
+  get_email:
+    description: "Ask for and extract email"
+    expects: ["email"]
+  
+  confirm:
+    description: "Confirm the collected information"
 ```
 
-## Quick Start
+**Run it in Python:**
+```python
+from chatguide import ChatGuide
 
-### 1. Install
+cg = ChatGuide(api_key="your_key")
+cg.load_config("config.yaml")
+
+# Start conversation
+reply = cg.chat()
+print(reply.assistant_reply)  # "Hi! Welcome..."
+
+# User responds
+cg.add_user_message("I'm John")
+reply = cg.chat()
+print(reply.assistant_reply)  # "Nice to meet you John! What's your email?"
+
+# Check progress anytime
+print(cg.get_progress())  # {"completed": 2, "total": 4, "percent": 50}
+print(cg.state.to_dict())  # {"user_name": "John"}
+```
+
+That's it. No conversation state management, no progress tracking, no session handling—it's all automatic.
+
+## What You Get
+
+- **Session Persistence** - Save and restore conversations with full state
+- **Progress Tracking** - Know exactly where you are in any conversation
+- **Real-Time Updates** - Stream events for live UI updates
+- **State Inspection** - See what data has been collected and what's missing
+- **Reactive Flows** - Conversation adjusts based on extracted data
+- **Metrics Built-in** - Track LLM calls, tokens, timing, errors
+- **Production Ready** - Structured logging, error tracking, middleware hooks
 
 ```bash
 pip install -e .
 ```
 
-### 2. Set API Key
-
+Set your API key:
 ```bash
-cp .env.example .env
-# Edit .env and add: GEMINI_API_KEY=your_key_here
+export GEMINI_API_KEY=your_key_here
 ```
 
-### 3. Run Demo
-
+Run the demo:
 ```bash
 streamlit run examples/streamlit_demo.py
-```
-
-Or run tests:
-```bash
-pytest tests/
 ```
 
 ## Core Concepts
@@ -604,52 +619,143 @@ streamlit run examples/streamlit_demo.py
 ```
 Full-featured web UI showcasing all ChatGuide capabilities.
 
-## Professional Assessment
+## Architecture
 
-### Framework Rating: 10/10 🏆
+**Core Principles:**
+1. **State as single source of truth** - All data flows through centralized state
+2. **LLM for reasoning** - Tasks handle language understanding and extraction
+3. **Runtime for execution** - Tools execute deterministic actions
+4. **Reactive adjustments** - Rules watch state and modify flow dynamically
+5. **Tone for expression** - Separates style from logic
 
-**Enterprise-Grade Features:**
-- ✅ **Session Persistence** - Checkpoint/resume for multi-session conversations
-- ✅ **Streaming Support** - Real-time event callbacks for WebSocket/SSE
-- ✅ **Structured Logging** - JSON/text logging with configurable output
-- ✅ **Metrics & Telemetry** - Track LLM calls, tokens, timing, success rates
-- ✅ **Middleware System** - Extensible hooks for custom logic
-- ✅ **Comprehensive State** - Professional-grade visibility into execution
-- ✅ **Error Tracking** - Full error logging with context
-- ✅ **Data Validation** - Track what was extracted, by which task, when
+**Design Philosophy:**
+- Declarative over imperative
+- Explicit over implicit  
+- Composition over inheritance
+- Simple over clever
 
-**Production Readiness:**
-- ✅ Session persistence (checkpoint/restore from JSON)
-- ✅ Streaming callbacks for real-time UIs
-- ✅ Structured logging (JSON/text with file output)
-- ✅ Metrics tracking (calls, tokens, timing, errors)
-- ✅ Middleware & task hooks for extensibility
-- ✅ Error tracking with full context
-- ✅ Data coverage analysis
-- ✅ Multi-language support (9 languages)
+## When to Use
 
-**Ease of Implementation: 10/10** 🚀
-- Simple chatbot: 10/10 (YAML + 3 lines of Python)
-- Production backend: 10/10 (checkpoint/resume, streaming, logging, metrics)
-- Complex workflows: 10/10 (adjustments, middleware, hooks for any scenario)
+**Good fit:**
+- Guided conversations with clear structure
+- Multi-step workflows requiring state tracking
+- Flows that need dynamic branching
+- Conversations requiring session persistence
+- UIs needing real-time progress updates
 
-### Best Use Cases
+**Not ideal for:**
+- Simple Q&A (use RAG/retrieval instead)
+- Open-ended conversations (no guided structure needed)
+- Complex multi-agent systems (consider agent frameworks)
 
-1. **Customer Service** - Guided support conversations with context switching
-2. **Onboarding Flows** - Multi-step user onboarding with data collection
-3. **Booking Systems** - Hotel, restaurant, appointment booking
-4. **Form Filling** - Interactive form completion with validation
-5. **Product Configuration** - Guided product customization flows
-6. **Troubleshooting** - Step-by-step diagnostic conversations
+## API Reference
 
-### When NOT to Use
+**Copy this into your LLM chat to get coding help:**
 
-- Simple Q&A without state tracking (use RAG instead)
-- Open-ended creative writing (no guided flow)
-- Multi-turn complex reasoning with tool loops (consider LangChain/AutoGPT)
+```
+ChatGuide API Reference:
+
+Core Classes:
+- ChatGuide(api_key, debug=False, language="en", log_format="json", log_file=None)
+  - load_config(path)
+  - chat() / chat_async() → ChatGuideReply
+  - add_user_message(message)
+  - get_state() → dict with execution/progress/tasks/data/metrics
+  - get_progress() → {completed, total, percent, current_task}
+  - get_current_task() → str
+  - get_next_tasks(limit=3) → list[str]
+  - is_waiting_for_user() → bool
+  - is_finished() → bool
+  - checkpoint(include_config=False) → dict
+  - save_checkpoint(path, include_config=True)
+  - load_checkpoint(path, api_key) → ChatGuide [classmethod]
+  - from_checkpoint(checkpoint, api_key) → ChatGuide [classmethod]
+  - set_session_id(session_id)
+  - set_session_metadata(metadata)
+  - add_stream_callback(callback)
+  - get_metrics() → dict
+  - reset_metrics()
+  - add_middleware(middleware_func)
+  - add_task_hook(task_id, hook_func)
+
+- State()
+  - get(key, default=None)
+  - set(key, value)
+  - update(dict)
+  - resolve_template(template) → resolves {{var}} patterns
+  - to_dict() → dict
+
+- Plan(blocks: list[list[str]])
+  - get_current_block() → list[str]
+  - advance()
+  - jump_to(index)
+  - insert_block(index, tasks)
+  - remove_block(index)
+  - is_finished() → bool
+
+Config YAML Structure:
+state:
+  key: value
+
+plan:
+  - [task1, task2]
+  - [task3]
+
+tasks:
+  task_id:
+    description: "What to do"
+    expects: ["key1", "key2"]
+    silent: false
+    tools:
+      - tool: tool_name
+        args: {}
+
+adjustments:
+  - name: adjustment_name
+    when: state.get("key") == value
+    actions:
+      - type: plan.insert_block / plan.jump_to / tone.set / state.set
+        key: value
+
+tone:
+  - tone_name
+
+tones:
+  tone_name:
+    description: "How to express"
+
+State Structure from get_state():
+{
+  "execution": {status, current_block_index, current_tasks, is_finished, 
+                pending_ui_tools, errors, error_count, retry_count},
+  "progress": {completed_tasks, pending_tasks, total_tasks, completed_count, blocks},
+  "tasks": {task_id: {status, description, expects, has_tools, is_silent}},
+  "data": {extracted_key: value},
+  "data_extractions": {key: {value, extracted_by, validated}},
+  "data_coverage": {expected_keys, collected_keys, missing_keys, coverage_percent},
+  "tone": [current_tones],
+  "adjustments": {fired: [...], all: {...}},
+  "conversation": {turn_count, user_message_count, last_user_message},
+  "last_response": {task_results, tools_called, was_silent}
+}
+
+Streaming Events:
+- {type: "task_complete", task_id, key, value}
+- {type: "tool_call", tool, options}
+- {type: "adjustment_fired", name, actions}
+- {type: "error", error, context}
+- {type: "llm_response", reply, was_silent}
+
+Middleware Signature:
+def middleware(context: dict) -> dict:
+    # context has: state, plan, current_task, conversation_history, phase
+    return modified_context
+
+Task Hook Signature:
+def hook(task_id: str, value: Any) -> None:
+    # Called when task completes
+```
 
 ---
 
-**Built for production** - Professional state management, clean architecture, maximum clarity.
-
-**ChatGuide: Enterprise-grade conversational AI framework** 🏆
+**ChatGuide** - State-driven conversational agent framework
