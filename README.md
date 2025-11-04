@@ -383,19 +383,34 @@ chatguide/
 
 ## Testing
 
+**Comprehensive test suite validates all 10/10 features:**
+
 ```bash
-# Run all tests
+# Run all tests (30 tests covering all features)
 pytest tests/
 
-# Run specific test
-pytest tests/test_state_inspection.py
+# Run with coverage report
+pytest tests/ --cov=chatguide --cov-report=term-missing
 
-# Run with coverage
-pytest --cov=chatguide tests/
+# Run specific test file
+pytest tests/test_comprehensive.py -v
 
 # Run Streamlit demo
 streamlit run examples/streamlit_demo.py
 ```
+
+**Test Coverage:**
+- ✅ State management & templates
+- ✅ Plan manipulation & flow control
+- ✅ Comprehensive state inspection
+- ✅ Helper methods (get_progress, get_current_task, etc.)
+- ✅ Session persistence (checkpoint/resume)
+- ✅ Streaming callbacks
+- ✅ Metrics & telemetry
+- ✅ Middleware & hooks
+- ✅ Error tracking
+- ✅ Config loading
+- ✅ Full workflow integration
 
 ## Advanced Features
 
