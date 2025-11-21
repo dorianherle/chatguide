@@ -113,13 +113,16 @@ plan.remove_block(1)               # Remove block
 ```
 
 ### Tasks
-LLM reasoning units that extract data:
+LLM reasoning units that extract data.
+
+The `expects` list defines **which state keys** the task should populate. This tells the LLM exactly what data to look for and what variable name to assign it to.
+
 ```yaml
 tasks:
   collect_name:
     description: "Ask for the user's name and extract it"
-    expects: ["user_name"]
-    silent: false  # Show AI response (default)
+    expects: ["user_name"]  # <--- Will save result to state.get("user_name")
+    silent: false
 ```
 
 **Silent tasks** collect data without showing a reply:
@@ -130,11 +133,11 @@ extract_name:
   silent: true  # No reply shown, immediate next task
 ```
 
-Each task outputs one key-value pair:
+When a task completes, it updates the state with the extracted value:
 ```json
 {
   "task_id": "collect_name",
-  "key": "user_name",
+  "key": "user_name",   # Matches one of the keys in 'expects'
   "value": "John Smith"
 }
 ```
