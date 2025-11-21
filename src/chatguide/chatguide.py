@@ -365,8 +365,17 @@ class ChatGuide:
         if not is_silent:
             self.add_assistant_message(reply.assistant_reply)
         
-        # 5. Check if current block is complete
+        # 4.5. Auto-complete tasks with no expectations
         current_block = self.plan.get_current_block()
+        for task_id in current_block:
+            task_def = self.tasks.get(task_id)
+            # If task exists, has no expectations, and we have a reply
+            if task_def and not task_def.expects:
+                if task_id not in self._completed_tasks:
+                    self._completed_tasks.append(task_id)
+                    self._metrics["task_completions"] += 1
+        
+        # 5. Check if current block is complete
         if self._is_block_complete(current_block, reply):
             self.plan.advance()
         
@@ -382,9 +391,8 @@ class ChatGuide:
     
     def _is_block_complete(self, block: List[str], reply: ChatGuideReply) -> bool:
         """Check if all tasks in block have been completed."""
-        # Simple heuristic: block complete if all tasks have results
-        completed_tasks = {tr.task_id for tr in reply.task_results}
-        return all(task_id in completed_tasks for task_id in block)
+        # Check against global completed tasks
+        return all(task_id in self._completed_tasks for task_id in block)
     
     def get_pending_ui_tools(self) -> list:
         """Get pending UI tools to render."""

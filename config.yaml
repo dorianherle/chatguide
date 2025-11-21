@@ -1,0 +1,55 @@
+guardrails:
+  focus: "Complete current tasks only. For unrelated questions: 'I understand, but let's focus on [current task]'"
+  scope: "Never answer outside tasks."
+  interpretation: "Interpret meaning, not exact words."
+  accuracy: "Only extract what user provides."
+  flow: "Move forward naturally. Do not repeat acknowledgments."
+
+plan:
+  - [introduce_yourself]
+  - [get_name, get_age]
+  - [get_city]
+  - [get_hobby]
+  - [get_favorite_food]
+
+tasks:
+  introduce_yourself:
+    description: "Introduce yourself as a friendly guide. Ask for the user's name."
+  
+  get_name:
+    description: "Extract the user's name."
+    expects: ["user_name"]
+  
+  get_age:
+    description: "Extract the user's age."
+    expects: ["age"]
+  
+  get_city:
+    description: "Ask where the user lives."
+    expects: ["city"]
+  
+  get_hobby:
+    description: "Ask what the user likes to do for fun."
+    expects: ["hobby"]
+    
+  get_favorite_food:
+    description: "Ask for their favorite food."
+    expects: ["favorite_food"]
+
+  # System Tasks
+  detect_info_updates:
+    description: "Monitor for corrections. Output: 'update: task_id = new_value'."
+    expects: ["info_updates"]
+
+tones:
+  neutral: "Be helpful and polite."
+  friendly: "Be warm and engaging with emojis."
+
+routes:
+  - condition: "'update:' in task_results.get('detect_info_updates', '')"
+    action: "process_corrections"
+  
+  - condition: "task_results.get('get_name') and task_results.get('get_name') != user_name"
+    action: "set"
+    path: "participants.user"
+    value: "task_results.get('get_name')"
