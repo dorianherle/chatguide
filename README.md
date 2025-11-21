@@ -73,9 +73,9 @@ Set your API key:
 export GEMINI_API_KEY=your_key_here
 ```
 
-Run the demo:
+Run the example:
 ```bash
-streamlit run examples/streamlit_demo.py
+python example_chat.py
 ```
 
 ## Core Concepts
