@@ -633,6 +633,24 @@ class ChatGuide:
         """Clear the last fired adjustments tracking."""
         self._last_fired_adjustments = []
     
+    def get_prompt(self) -> str:
+        """Get the current prompt that would be sent to the LLM.
+        
+        Useful for debugging and inspection.
+        """
+        return PromptBuilder(
+            self.state,
+            self.plan,
+            self.tasks,
+            self.tone,
+            self.tone_definitions,
+            self.guardrails,
+            self.conversation_history,
+            self.language,
+            self._completed_tasks
+        ).build()
+
+    
     # ==================== SESSION PERSISTENCE ====================
     
     def checkpoint(self, include_config: bool = False) -> Dict[str, Any]:

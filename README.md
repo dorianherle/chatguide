@@ -678,6 +678,7 @@ Core Classes:
   - add_stream_callback(callback)
   - get_metrics() → dict
   - reset_metrics()
+  - get_prompt() → str
   - add_middleware(middleware_func)
   - add_task_hook(task_id, hook_func)
 
