@@ -178,7 +178,8 @@ class ChatGuide:
             self.tone_definitions,
             self.guardrails,
             self.conversation_history,
-            self.language
+            self.language,
+            self._completed_tasks
         ).build()
         
         # Call LLM
@@ -218,7 +219,8 @@ class ChatGuide:
                 self.tone_definitions,
                 self.guardrails,
                 self.conversation_history,
-                self.language
+                self.language,
+                self._completed_tasks
             ).build()
             
             # Call LLM again

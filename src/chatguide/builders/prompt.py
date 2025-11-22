@@ -14,7 +14,7 @@ class PromptBuilder:
     def __init__(self, state: "State", plan: "Plan", tasks: Dict[str, "TaskDefinition"],
                  tone: List[str], tone_definitions: Dict[str, str], 
                  guardrails: str, conversation_history: List[Dict[str, str]],
-                 language: str = "en"):
+                 language: str = "en", completed_tasks: List[str] = None):
         self.state = state
         self.plan = plan
         self.tasks = tasks
@@ -23,6 +23,7 @@ class PromptBuilder:
         self.guardrails = guardrails
         self.conversation_history = conversation_history
         self.language = language
+        self.completed_tasks = completed_tasks or []
         
         # Load language templates on first use
         if PromptBuilder._lang_templates is None:
@@ -123,6 +124,10 @@ CRITICAL RULES:
         for task_id in task_ids:
             task = self.tasks.get(task_id)
             if not task:
+                continue
+            
+            # Skip completed tasks
+            if task_id in self.completed_tasks:
                 continue
             
             lines.append(f"\nTask: {task_id}")
