@@ -667,6 +667,7 @@ Core Classes:
   - get_progress() → {completed, total, percent, current_task}
   - get_current_task() → str
   - get_next_tasks(limit=3) → list[str]
+  - get_next_blocks(limit=3) → list[list[str]]
   - is_waiting_for_user() → bool
   - is_finished() → bool
   - checkpoint(include_config=False) → dict

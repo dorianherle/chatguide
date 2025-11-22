@@ -618,6 +618,28 @@ class ChatGuide:
         pending = self._get_pending_tasks()
         return pending[:limit]
     
+    def get_next_blocks(self, limit: int = 3) -> List[List[str]]:
+        """Get upcoming task blocks, filtering out completed tasks.
+        
+        Returns:
+            List of blocks (lists of task IDs) that have pending tasks.
+            Example: [['get_name', 'get_age'], ['get_origin']]
+        """
+        blocks = []
+        # Start from current index
+        for i in range(self.plan.current_index, len(self.plan._blocks)):
+            block = self.plan._blocks[i]
+            # Filter out completed tasks
+            pending_in_block = [t for t in block if t not in self._completed_tasks]
+            
+            if pending_in_block:
+                blocks.append(pending_in_block)
+            
+            if len(blocks) >= limit:
+                break
+                
+        return blocks
+    
     def is_waiting_for_user(self) -> bool:
         """Check if the guide is waiting for user input.
         
