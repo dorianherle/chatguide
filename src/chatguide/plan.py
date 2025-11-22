@@ -1,29 +1,30 @@
 """Plan - ordered sequence of task blocks with manipulation methods."""
 
-from typing import List
-
+from typing import List, Optional
+from .core.block import Block
+from .core.task import Task
 
 class Plan:
     """Ordered list of task blocks defining execution flow.
     
-    Each block is a list of task names.
+    Manages a sequence of Block objects.
     """
     
-    def __init__(self, blocks: List[List[str]] = None):
-        self._blocks: List[List[str]] = blocks or []
+    def __init__(self, blocks: List[Block] = None):
+        self._blocks: List[Block] = blocks or []
         self._current_index = 0
     
-    def get_current_block(self) -> List[str]:
+    def get_current_block(self) -> Optional[Block]:
         """Get current task block."""
         if self._current_index < len(self._blocks):
             return self._blocks[self._current_index]
-        return []
+        return None
     
-    def get_block(self, index: int) -> List[str]:
+    def get_block(self, index: int) -> Optional[Block]:
         """Get task block at index."""
         if 0 <= index < len(self._blocks):
             return self._blocks[index]
-        return []
+        return None
     
     def advance(self):
         """Move to next block."""
@@ -35,33 +36,34 @@ class Plan:
         if 0 <= index < len(self._blocks):
             self._current_index = index
     
-    def insert_block(self, index: int, tasks: List[str]):
+    def insert_block(self, index: int, block: Block):
         """Insert task block at index."""
-        self._blocks.insert(index, tasks)
+        self._blocks.insert(index, block)
     
     def remove_block(self, index: int):
         """Remove block at index."""
         if 0 <= index < len(self._blocks):
             self._blocks.pop(index)
     
-    def replace_block(self, index: int, tasks: List[str]):
+    def replace_block(self, index: int, block: Block):
         """Replace block at index."""
         if 0 <= index < len(self._blocks):
-            self._blocks[index] = tasks
-    
-    def insert_task(self, block_index: int, task: str, position: int = None):
-        """Insert task into a block."""
-        if 0 <= block_index < len(self._blocks):
-            if position is None:
-                self._blocks[block_index].append(task)
-            else:
-                self._blocks[block_index].insert(position, task)
-    
-    def remove_task(self, block_index: int, task: str):
-        """Remove task from a block."""
-        if 0 <= block_index < len(self._blocks):
-            if task in self._blocks[block_index]:
-                self._blocks[block_index].remove(task)
+            self._blocks[index] = block
+            
+    def get_all_tasks(self) -> List[Task]:
+        """Get all tasks in the plan."""
+        tasks = []
+        for block in self._blocks:
+            tasks.extend(block.tasks)
+        return tasks
+        
+    def get_task(self, task_id: str) -> Optional[Task]:
+        """Find a task by ID anywhere in the plan."""
+        for block in self._blocks:
+            task = block.get_task(task_id)
+            if task:
+                return task
+        return None
     
     def is_finished(self) -> bool:
         """Check if plan is complete."""
@@ -75,7 +77,7 @@ class Plan:
     def to_dict(self) -> dict:
         """Export plan as dict."""
         return {
-            "blocks": self._blocks,
+            "blocks": [b.to_dict() for b in self._blocks],
             "current_index": self._current_index,
             "is_finished": self.is_finished()
         }

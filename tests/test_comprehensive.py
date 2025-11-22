@@ -8,6 +8,8 @@ from chatguide import ChatGuide
 from chatguide.schemas import TaskDefinition
 from chatguide.plan import Plan
 from chatguide.state import State
+from chatguide.core.task import Task
+from chatguide.core.block import Block
 
 
 class TestStateManagement:
@@ -35,34 +37,52 @@ class TestStateManagement:
         template = {"location": "{{city}}, {{country}}"}
         result = state.resolve_template(template)
         assert result == {"location": "NYC, USA"}
+    
+    def test_typed_access(self):
+        state = State({"age": "30", "count": 5})
+        assert state.get_typed("age", int) == 30
+        assert state.get_typed("count", int) == 5
+        assert state.get_typed("missing", int, 0) == 0
 
 
 class TestPlanManipulation:
     """Test plan and flow control."""
     
     def test_plan_creation(self):
-        plan = Plan([["task1"], ["task2", "task3"]])
+        t1 = Task("task1", "desc")
+        t2 = Task("task2", "desc")
+        t3 = Task("task3", "desc")
+        plan = Plan([Block([t1]), Block([t2, t3])])
         assert len(plan._blocks) == 2
         assert plan.current_index == 0
     
     def test_plan_advance(self):
-        plan = Plan([["task1"], ["task2"]])
+        t1 = Task("task1", "desc")
+        t2 = Task("task2", "desc")
+        plan = Plan([Block([t1]), Block([t2])])
         plan.advance()
         assert plan.current_index == 1
-        assert plan.get_current_block() == ["task2"]
+        assert plan.get_current_block().task_ids == ["task2"]
     
     def test_plan_jump(self):
-        plan = Plan([["task1"], ["task2"], ["task3"]])
+        t1 = Task("task1", "desc")
+        t2 = Task("task2", "desc")
+        t3 = Task("task3", "desc")
+        plan = Plan([Block([t1]), Block([t2]), Block([t3])])
         plan.jump_to(2)
         assert plan.current_index == 2
     
     def test_plan_insert_block(self):
-        plan = Plan([["task1"], ["task3"]])
-        plan.insert_block(1, ["task2"])
-        assert plan._blocks == [["task1"], ["task2"], ["task3"]]
+        t1 = Task("task1", "desc")
+        t2 = Task("task2", "desc")
+        t3 = Task("task3", "desc")
+        plan = Plan([Block([t1]), Block([t3])])
+        plan.insert_block(1, Block([t2]))
+        assert [b.task_ids for b in plan._blocks] == [["task1"], ["task2"], ["task3"]]
     
     def test_plan_is_finished(self):
-        plan = Plan([["task1"]])
+        t1 = Task("task1", "desc")
+        plan = Plan([Block([t1])])
         assert not plan.is_finished()
         plan.advance()
         assert plan.is_finished()
@@ -73,12 +93,10 @@ class TestComprehensiveState:
     
     def test_get_state_structure(self):
         cg = ChatGuide(api_key="test")
-        cg.plan = Plan([["greet"], ["get_name", "get_age"]])
-        cg.tasks = {
-            "greet": TaskDefinition(description="Greet user"),
-            "get_name": TaskDefinition(description="Get name", expects=["user_name"]),
-            "get_age": TaskDefinition(description="Get age", expects=["age"])
-        }
+        t1 = Task("greet", "Greet user")
+        t2 = Task("get_name", "Get name", expects=["user_name"])
+        t3 = Task("get_age", "Get age", expects=["age"])
+        cg.plan = Plan([Block([t1]), Block([t2, t3])])
         
         state = cg.get_state()
         
@@ -95,9 +113,8 @@ class TestComprehensiveState:
     
     def test_task_metadata(self):
         cg = ChatGuide(api_key="test")
-        cg.tasks = {
-            "get_name": TaskDefinition(description="Get name", expects=["user_name"], silent=False)
-        }
+        t1 = Task("get_name", "Get name", expects=["user_name"], silent=False)
+        cg.plan = Plan([Block([t1])])
         
         state = cg.get_state()
         task_meta = state['tasks']['get_name']
@@ -109,10 +126,10 @@ class TestComprehensiveState:
     
     def test_data_coverage(self):
         cg = ChatGuide(api_key="test")
-        cg.tasks = {
-            "get_name": TaskDefinition(description="Get name", expects=["user_name"]),
-            "get_age": TaskDefinition(description="Get age", expects=["age"])
-        }
+        t1 = Task("get_name", "Get name", expects=["user_name"])
+        t2 = Task("get_age", "Get age", expects=["age"])
+        cg.plan = Plan([Block([t1]), Block([t2])])
+        
         cg.state.set("user_name", "John")
         
         state = cg.get_state()
@@ -128,19 +145,27 @@ class TestHelperMethods:
     
     def test_get_current_task(self):
         cg = ChatGuide(api_key="test")
-        cg.plan = Plan([["task1", "task2"]])
+        t1 = Task("task1", "desc")
+        t2 = Task("task2", "desc")
+        cg.plan = Plan([Block([t1, t2])])
         
         # Initially first task
         assert cg.get_current_task() == "task1"
         
         # After completing first task
-        cg._completed_tasks.append("task1")
+        t1.complete("key", "val")
         assert cg.get_current_task() == "task2"
     
     def test_get_progress(self):
         cg = ChatGuide(api_key="test")
-        cg.plan = Plan([["task1"], ["task2"], ["task3"], ["task4"]])
-        cg._completed_tasks = ["task1", "task2"]
+        t1 = Task("task1", "desc")
+        t2 = Task("task2", "desc")
+        t3 = Task("task3", "desc")
+        t4 = Task("task4", "desc")
+        cg.plan = Plan([Block([t1]), Block([t2]), Block([t3]), Block([t4])])
+        
+        t1.complete("k", "v")
+        t2.complete("k", "v")
         
         progress = cg.get_progress()
         assert progress['completed'] == 2
@@ -149,8 +174,12 @@ class TestHelperMethods:
     
     def test_get_next_tasks(self):
         cg = ChatGuide(api_key="test")
-        cg.plan = Plan([["task1"], ["task2"], ["task3"]])
-        cg._completed_tasks = ["task1"]
+        t1 = Task("task1", "desc")
+        t2 = Task("task2", "desc")
+        t3 = Task("task3", "desc")
+        cg.plan = Plan([Block([t1]), Block([t2]), Block([t3])])
+        
+        t1.complete("k", "v")
         
         next_tasks = cg.get_next_tasks(limit=2)
         assert "task2" in next_tasks
@@ -171,7 +200,9 @@ class TestSessionPersistence:
     def test_checkpoint_creation(self):
         cg = ChatGuide(api_key="test")
         cg.state.set("user_name", "Alice")
-        cg._completed_tasks = ["greet"]
+        t1 = Task("greet", "desc")
+        t1.complete("k", "v")
+        cg.plan = Plan([Block([t1])])
         cg._session_id = "test_session"
         
         checkpoint = cg.checkpoint()
@@ -186,7 +217,9 @@ class TestSessionPersistence:
         # Create and save checkpoint
         cg1 = ChatGuide(api_key="test")
         cg1.state.set("city", "NYC")
-        cg1._completed_tasks = ["task1"]
+        t1 = Task("task1", "desc")
+        t1.complete("k", "v")
+        cg1.plan = Plan([Block([t1])])
         cg1._session_id = "session123"
         
         checkpoint_path = tmp_path / "test_checkpoint.json"
@@ -198,7 +231,10 @@ class TestSessionPersistence:
         cg2 = ChatGuide.load_checkpoint(str(checkpoint_path), api_key="test")
         
         assert cg2.state.get("city") == "NYC"
-        assert "task1" in cg2._completed_tasks
+        # Check if task1 is completed in restored plan
+        restored_task = cg2.plan.get_task("task1")
+        assert restored_task is not None
+        assert restored_task.is_completed()
         assert cg2._session_id == "session123"
     
     def test_from_checkpoint(self):
@@ -222,6 +258,8 @@ class TestSessionPersistence:
         cg = ChatGuide.from_checkpoint(checkpoint, api_key="test")
         assert cg.state.get("name") == "Bob"
         assert cg._session_id == "test"
+        # Verify dummy task creation
+        assert cg.plan.get_task("task1") is not None
 
 
 class TestStreamingCallbacks:
@@ -364,8 +402,8 @@ tone:
         
         assert cg.state.get("user_name") is None
         assert len(cg.plan._blocks) == 2
-        assert "greet" in cg.tasks
-        assert "get_name" in cg.tasks
+        assert cg.plan.get_task("greet") is not None
+        assert cg.plan.get_task("get_name") is not None
         assert "professional" in cg.tone
 
 
@@ -377,18 +415,16 @@ class TestIntegration:
         cg = ChatGuide(api_key="test")
         
         # Setup
-        cg.plan = Plan([
-            ["greet"],
-            ["get_name", "get_age"],
-            ["confirm"]
-        ])
+        t1 = Task("greet", "Greet user")
+        t2 = Task("get_name", "Get name", expects=["user_name"])
+        t3 = Task("get_age", "Get age", expects=["age"])
+        t4 = Task("confirm", "Confirm details")
         
-        cg.tasks = {
-            "greet": TaskDefinition(description="Greet user"),
-            "get_name": TaskDefinition(description="Get name", expects=["user_name"]),
-            "get_age": TaskDefinition(description="Get age", expects=["age"]),
-            "confirm": TaskDefinition(description="Confirm details")
-        }
+        cg.plan = Plan([
+            Block([t1]),
+            Block([t2, t3]),
+            Block([t4])
+        ])
         
         # Initial state
         state = cg.get_state()
@@ -396,7 +432,7 @@ class TestIntegration:
         assert state['progress']['completed_count'] == 0
         
         # Simulate task completion
-        cg._completed_tasks.append("greet")
+        t1.complete("k", "v")
         cg.plan.advance()
         
         state = cg.get_state()
@@ -406,7 +442,8 @@ class TestIntegration:
         # Complete data collection
         cg.state.set("user_name", "Alice")
         cg.state.set("age", 25)
-        cg._completed_tasks.extend(["get_name", "get_age"])
+        t2.complete("user_name", "Alice")
+        t3.complete("age", 25)
         cg.plan.advance()
         
         state = cg.get_state()
@@ -449,4 +486,3 @@ def test_all_features_present():
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
-

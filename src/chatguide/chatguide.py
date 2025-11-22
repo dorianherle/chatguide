@@ -10,6 +10,11 @@ from pathlib import Path
 
 from .state import State
 from .plan import Plan
+from .core.task import Task
+from .core.block import Block
+from .core.context import Context
+from .core.execution import ExecutionState
+from .core.audit import AuditLog
 from .adjustments import Adjustments, Adjustment
 from .tool_executor import ToolRegistry, ToolExecutor, get_tool_registry
 from .schemas import TaskDefinition, ChatGuideReply, ToolCall
@@ -31,12 +36,14 @@ class ChatGuide:
     and adjustments keep the plan dynamic and reactive.
     """
     
-    def __init__(self, api_key: str = None, debug: bool = False, language: str = "en", 
-                 log_format: str = "json", log_file: Optional[str] = None):
-        # Core components
-        self.state = State()
+    def __init__(self, api_key: str = None, config: str = None, debug: bool = False, 
+                 language: str = "en", log_format: str = "json", log_file: Optional[str] = None):
+        # Core 4-layer architecture
+        self.audit = AuditLog()
+        self.state = State(audit_log=self.audit)
+        self.context = Context()
+        self.execution = ExecutionState()
         self.plan = Plan()
-        self.tasks: Dict[str, TaskDefinition] = {}
         self.adjustments = Adjustments()
         self.tool_registry = get_tool_registry()
         self.tool_executor = ToolExecutor(self.tool_registry)
@@ -54,27 +61,19 @@ class ChatGuide:
         self.guardrails: str = ""
         self.language: str = language
         
-        # Conversation
-        self.conversation_history: List[Dict[str, str]] = []
-        
         # Tracking
         self._last_fired_adjustments: List[str] = []
-        self._completed_tasks: List[str] = []  # Track completed task IDs
-        self._execution_status: str = "idle"  # idle | processing | awaiting_input | complete
-        self._data_extractions: Dict[str, Dict[str, Any]] = {}  # Track what data was extracted by which task
-        self._last_response: Optional[ChatGuideReply] = None  # Last LLM response
-        self._last_response_silent: bool = False  # Was last response silent
-        self._errors: List[Dict[str, Any]] = []  # Error log
-        self._retry_count: int = 0  # Retry counter
-        self._session_id: Optional[str] = None  # Session identifier
-        self._session_metadata: Dict[str, Any] = {}  # Custom session data
+        self._last_response: Optional[ChatGuideReply] = None
+        self._last_response_silent: bool = False
+        self._errors: List[Dict[str, Any]] = []
+        self._retry_count: int = 0
         
         # Streaming callbacks
         self._stream_callbacks: List[Callable] = []
         
         # Middleware/Plugins
-        self._middleware: List[Callable] = []  # Pre/post hooks
-        self._task_hooks: Dict[str, List[Callable]] = {}  # Task-specific hooks
+        self._middleware: List[Callable] = []
+        self._task_hooks: Dict[str, List[Callable]] = {}
         
         # Metrics
         self._metrics: Dict[str, Any] = {
@@ -88,6 +87,10 @@ class ChatGuide:
         # Settings
         self.api_key = api_key
         self.debug = debug
+        
+        # Auto-load config if provided
+        if config:
+            self.load_config(config)
     
     def load_config(self, path: str):
         """Load configuration from YAML file."""
@@ -97,12 +100,32 @@ class ChatGuide:
         initial_state = parse_state(data)
         self.state = State(initial_state)
         
-        # Parse plan
-        plan_blocks = parse_plan(data)
-        self.plan = Plan(plan_blocks)
+        # Parse tasks definitions first
+        task_defs = parse_tasks(data)
         
-        # Parse tasks
-        self.tasks = parse_tasks(data)
+        # Parse plan blocks (list of lists of strings)
+        raw_blocks = parse_plan(data)
+        
+        # Convert to Block and Task objects
+        blocks = []
+        for raw_block in raw_blocks:
+            tasks = []
+            for task_id in raw_block:
+                if task_id in task_defs:
+                    def_ = task_defs[task_id]
+                    tasks.append(Task(
+                        id=task_id,
+                        description=def_.description,
+                        expects=def_.expects,
+                        tools=def_.tools,
+                        silent=def_.silent
+                    ))
+                else:
+                    # Create dummy task if not defined (should warn)
+                    tasks.append(Task(id=task_id, description=""))
+            blocks.append(Block(tasks))
+            
+        self.plan = Plan(blocks)
         
         # Parse tools
         tool_defs = parse_tools(data)
@@ -131,17 +154,11 @@ class ChatGuide:
     
     def add_user_message(self, message: str):
         """Add user message to history."""
-        self.conversation_history.append({
-            "role": "user",
-            "content": message
-        })
+        self.context.add_message("user", message)
     
     def add_assistant_message(self, message: str):
         """Add assistant message to history."""
-        self.conversation_history.append({
-            "role": "assistant",
-            "content": message
-        })
+        self.context.add_message("assistant", message)
     
     async def chat_async(
         self,
@@ -152,34 +169,42 @@ class ChatGuide:
     ) -> ChatGuideReply:
         """Execute one chat turn (async)."""
         # Update status
-        self._execution_status = "processing"
+        self.execution.status = "processing"
         
         # Run before middleware
         context = self._run_middleware("before", {
             "state": self.state.to_dict(),
             "plan": self.plan.to_dict(),
             "current_task": self.get_current_task(),
-            "conversation_history": self.conversation_history
+            "conversation_history": self.context.get_history_dict()
         })
         
         # Check if ANY current task is silent (not all)
-        current_tasks = self.plan.get_current_block()
-        has_silent_task = any(
-            self.tasks.get(task_id, TaskDefinition(description="")).silent 
-            for task_id in current_tasks
-        ) if current_tasks else False
+        current_block = self.plan.get_current_block()
+        has_silent_task = any(t.silent for t in current_block.get_pending_tasks()) if current_block else False
         
         # Build prompt
+        # Adapter for PromptBuilder which expects dict of TaskDefinition
+        # We construct it from current plan tasks
+        tasks_map = {t.id: TaskDefinition(
+            description=t.description,
+            expects=t.expects,
+            tools=t.tools,
+            silent=t.silent
+        ) for t in self.plan.get_all_tasks()}
+        
+        completed_ids = [t.id for t in self.plan.get_all_tasks() if t.is_completed()]
+        
         prompt = PromptBuilder(
             self.state,
             self.plan,
-            self.tasks,
+            tasks_map,
             self.tone,
             self.tone_definitions,
             self.guardrails,
-            self.conversation_history,
+            self.context.get_history_dict(),
             self.language,
-            self._completed_tasks
+            completed_ids
         ).build()
         
         # Call LLM
@@ -199,28 +224,31 @@ class ChatGuide:
         # Check if THIS specific reply is for a silent task
         is_this_silent = False
         if reply.task_results:
-            for task_result in reply.task_results:
-                task_def = self.tasks.get(task_result.task_id)
-                if task_def and task_def.silent:
-                    is_this_silent = True
-                    break
+            current_block = self.plan.get_current_block()
+            if current_block:
+                for task in current_block.get_pending_tasks():
+                    if task.silent:
+                        is_this_silent = True
+                        break
         
         # Process reply (may be silent)
         await self._process_reply(reply, is_silent=is_this_silent)
         
         # If silent, immediately call again with new tone/state
         if is_this_silent:
-            # Build new prompt with updated state/tone
+            # Re-build prompt with updated state
+            completed_ids = [t.id for t in self.plan.get_all_tasks() if t.is_completed()]
+            
             prompt_updated = PromptBuilder(
                 self.state,
                 self.plan,
-                self.tasks,
+                tasks_map,
                 self.tone,
                 self.tone_definitions,
                 self.guardrails,
-                self.conversation_history,
+                self.context.get_history_dict(),
                 self.language,
-                self._completed_tasks
+                completed_ids
             ).build()
             
             # Call LLM again
@@ -260,12 +288,15 @@ class ChatGuide:
         # Update metrics
         self._metrics["llm_calls"] += 1
         
+        # Get current task for tracking
+        current_task_id = self.get_current_task()
+        
         # Emit LLM response event
         self._emit_event({
             "type": "llm_response",
             "reply": reply.assistant_reply,
             "was_silent": is_silent,
-            "task_results": [{"task_id": tr.task_id, "key": tr.key} for tr in reply.task_results]
+            "task_results": [{"key": tr.key} for tr in reply.task_results]
         })
         
         # Log LLM response
@@ -273,34 +304,39 @@ class ChatGuide:
             self.logger.llm_response(
                 reply.assistant_reply, 
                 is_silent, 
-                [{"task_id": tr.task_id, "key": tr.key} for tr in reply.task_results]
+                [{"key": tr.key} for tr in reply.task_results]
             )
         
         # 1. Update state with task results
         for task_result in reply.task_results:
-            # Emit task start event
+            # Emit task complete event
             self._emit_event({
                 "type": "task_complete",
-                "task_id": task_result.task_id,
+                "task_id": current_task_id,
                 "key": task_result.key,
                 "value": task_result.value
             })
             
-            self.state.set(task_result.key, task_result.value)
-            # Track completed tasks
-            if task_result.task_id not in self._completed_tasks:
-                self._completed_tasks.append(task_result.task_id)
+            # Set state with source task for audit
+            self.state.set(task_result.key, task_result.value, source_task=current_task_id)
+            
+            # Find and mark task as complete
+            # Look for task that expects this key
+            task = None
+            current_block = self.plan.get_current_block()
+            if current_block:
+                for t in current_block.get_pending_tasks():
+                    if task_result.key in t.expects or t.id == task_result.key:
+                        task = t
+                        break
+            
+            if task and not task.is_completed():
+                task.complete(task_result.key, task_result.value)
                 self._metrics["task_completions"] += 1
+                self.execution.mark_complete(task.id)
                 
                 # Run task hooks
-                self._run_task_hooks(task_result.task_id, task_result.value)
-            
-            # Track data extraction
-            self._data_extractions[task_result.key] = {
-                "value": task_result.value,
-                "extracted_by": task_result.task_id,
-                "validated": True  # Assume validated if LLM extracted it
-            }
+                self._run_task_hooks(task.id, task_result.value)
         
         # 2. Execute tools
         for tool_call in reply.tools:
@@ -322,14 +358,14 @@ class ChatGuide:
                 
                 # Merge output into state
                 if output:
-                    self.state.update(output)
+                    self.state.update(output, source_task=current_task_id)
             except Exception as e:
                 # Track errors
                 error_data = {
                     "type": "tool_execution",
                     "tool": tool_call.tool,
                     "error": str(e),
-                    "task": self.get_current_task(),
+                    "task": current_task_id,
                     "timestamp": datetime.now().isoformat()
                 }
                 self._errors.append(error_data)
@@ -369,32 +405,27 @@ class ChatGuide:
         
         # 4.5. Auto-complete tasks with no expectations
         current_block = self.plan.get_current_block()
-        for task_id in current_block:
-            task_def = self.tasks.get(task_id)
-            # If task exists, has no expectations, and we have a reply
-            if task_def and not task_def.expects:
-                if task_id not in self._completed_tasks:
-                    self._completed_tasks.append(task_id)
+        if current_block:
+            for task in current_block.tasks:
+                # If task exists, has no expectations, and we have a reply
+                if not task.expects and not task.is_completed():
+                    task.complete("auto", True)
                     self._metrics["task_completions"] += 1
+                    self.execution.mark_complete(task.id)
         
         # 5. Check if current block is complete
-        if self._is_block_complete(current_block, reply):
+        if current_block and current_block.is_complete():
             self.plan.advance()
         
         # 6. Update execution status
         if self.plan.is_finished():
-            self._execution_status = "complete"
+            self.execution.status = "complete"
         else:
-            self._execution_status = "awaiting_input"
+            self.execution.status = "awaiting_input"
         
         # Update timing metrics
         duration_ms = (time.time() - start_time) * 1000
         self._metrics["total_duration_ms"] += duration_ms
-    
-    def _is_block_complete(self, block: List[str], reply: ChatGuideReply) -> bool:
-        """Check if all tasks in block have been completed."""
-        # Check against global completed tasks
-        return all(task_id in self._completed_tasks for task_id in block)
     
     def get_pending_ui_tools(self) -> list:
         """Get pending UI tools to render."""
@@ -415,61 +446,54 @@ class ChatGuide:
     
     def _get_all_tasks(self) -> List[str]:
         """Get all task IDs from plan."""
-        all_tasks = []
-        for block in self.plan._blocks:
-            all_tasks.extend(block)
-        return all_tasks
+        return [t.id for t in self.plan.get_all_tasks()]
     
     def _get_pending_tasks(self) -> List[str]:
         """Get all tasks that haven't been completed yet."""
-        all_tasks = self._get_all_tasks()
-        return [task for task in all_tasks if task not in self._completed_tasks]
+        return [t.id for t in self.plan.get_all_tasks() if not t.is_completed()]
     
     def _get_block_metadata(self) -> List[Dict[str, Any]]:
         """Get metadata for all blocks with completion status."""
         metadata = []
         for index, block in enumerate(self.plan._blocks):
-            all_completed = all(task in self._completed_tasks for task in block)
-            any_completed = any(task in self._completed_tasks for task in block)
-            
             if index < self.plan.current_index:
                 status = "completed"
             elif index == self.plan.current_index:
-                status = "in_progress" if any_completed else "current"
+                status = "in_progress" if any(t.is_completed() for t in block.tasks) else "current"
             else:
                 status = "pending"
             
             metadata.append({
                 "index": index,
-                "tasks": block,
+                "tasks": block.task_ids,
                 "status": status,
-                "completed": all_completed
+                "completed": block.is_complete()
             })
         return metadata
     
     def _get_task_metadata(self) -> Dict[str, Dict[str, Any]]:
         """Get metadata for all tasks with status and definitions."""
         task_meta = {}
-        for task_id, task_def in self.tasks.items():
-            status = "completed" if task_id in self._completed_tasks else "pending"
-            if task_id == self.get_current_task():
+        for task in self.plan.get_all_tasks():
+            status = task.status
+            if task.id == self.get_current_task():
                 status = "in_progress"
             
-            task_meta[task_id] = {
+            task_meta[task.id] = {
                 "status": status,
-                "description": task_def.description,
-                "expects": task_def.expects,
-                "has_tools": len(task_def.tools) > 0,
-                "tool_count": len(task_def.tools),
-                "is_silent": task_def.silent
+                "description": task.description,
+                "expects": task.expects,
+                "has_tools": len(task.tools) > 0,
+                "tool_count": len(task.tools),
+                "is_silent": task.silent
             }
         return task_meta
     
     def _get_expected_keys(self) -> List[str]:
         """Get all keys that tasks expect to extract."""
         expected = []
-        for task_def in self.tasks.values():
-            expected.extend(task_def.expects)
+        for task in self.plan.get_all_tasks():
+            expected.extend(task.expects)
         return list(set(expected))  # Remove duplicates
     
     def _get_data_coverage(self) -> Dict[str, Any]:
@@ -500,26 +524,28 @@ class ChatGuide:
         - last_response: metadata from last LLM call
         """
         current_block = self.plan.get_current_block()
-        all_tasks = self._get_all_tasks()
+        current_tasks = current_block.task_ids if current_block else []
+        all_tasks = self.plan.get_all_tasks()
+        completed_tasks = [t.id for t in all_tasks if t.is_completed()]
         pending_ui_tools = self.get_pending_ui_tools()
         
-        # Get last messages
+        # Get last messages from context
         last_user_msg = None
         last_assistant_msg = None
-        for msg in reversed(self.conversation_history):
-            if msg['role'] == 'user' and last_user_msg is None:
-                last_user_msg = msg['content']
-            if msg['role'] == 'assistant' and last_assistant_msg is None:
-                last_assistant_msg = msg['content']
+        for msg in reversed(self.context.history):
+            if msg.role == 'user' and last_user_msg is None:
+                last_user_msg = msg.content
+            if msg.role == 'assistant' and last_assistant_msg is None:
+                last_assistant_msg = msg.content
             if last_user_msg and last_assistant_msg:
                 break
         
         state = {
             "execution": {
                 "current_block_index": self.plan.current_index,
-                "current_tasks": current_block,
+                "current_tasks": current_tasks,
                 "is_finished": self.plan.is_finished(),
-                "status": self._execution_status,
+                "status": self.execution.status,
                 "pending_ui_tools": pending_ui_tools,
                 "waiting_for_tool": pending_ui_tools[0] if pending_ui_tools else None,
                 "errors": self._errors.copy(),
@@ -527,15 +553,14 @@ class ChatGuide:
                 "retry_count": self._retry_count
             },
             "progress": {
-                "completed_tasks": self._completed_tasks.copy(),
+                "completed_tasks": completed_tasks,
                 "pending_tasks": self._get_pending_tasks(),
                 "total_tasks": len(all_tasks),
-                "completed_count": len(self._completed_tasks),
+                "completed_count": len(completed_tasks),
                 "blocks": self._get_block_metadata()
             },
             "tasks": self._get_task_metadata(),
-            "data": self.state.to_dict(),
-            "data_extractions": self._data_extractions.copy(),
+            "data": self.state.variables,
             "data_coverage": self._get_data_coverage(),
             "tone": self.tone,
             "adjustments": {
@@ -543,9 +568,9 @@ class ChatGuide:
                 "all": self.adjustments.to_dict()
             },
             "conversation": {
-                "turn_count": len(self.conversation_history),
-                "user_message_count": len([m for m in self.conversation_history if m['role'] == 'user']),
-                "assistant_message_count": len([m for m in self.conversation_history if m['role'] == 'assistant']),
+                "turn_count": len(self.context.history),
+                "user_message_count": len([m for m in self.context.history if m.role == 'user']),
+                "assistant_message_count": len([m for m in self.context.history if m.role == 'assistant']),
                 "last_user_message": last_user_msg,
                 "last_assistant_message": last_assistant_msg
             }
@@ -555,7 +580,7 @@ class ChatGuide:
         if self._last_response:
             state["last_response"] = {
                 "task_results": [
-                    {"task_id": tr.task_id, "key": tr.key, "value": tr.value}
+                    {"key": tr.key, "value": tr.value}
                     for tr in self._last_response.task_results
                 ],
                 "tools_called": [
@@ -568,6 +593,24 @@ class ChatGuide:
         
         return state
     
+    def dump(self) -> Dict[str, Any]:
+        """Export complete 4-layer data model for persistence.
+        
+        Returns:
+            {
+                "variables": {...},  # Business data
+                "context": {...},    # Conversation history
+                "execution": {...},  # Flow state
+                "audit": [...]       # Change log
+            }
+        """
+        return {
+            "variables": self.state.variables,
+            "context": self.context.to_dict(),
+            "execution": self.execution.to_dict(),
+            "audit": self.audit.to_list()
+        }
+    
     def get_current_task(self) -> Optional[str]:
         """Get the current task being executed.
         
@@ -578,9 +621,12 @@ class ChatGuide:
             return None
         
         current_block = self.plan.get_current_block()
-        for task in current_block:
-            if task not in self._completed_tasks:
-                return task
+        if not current_block:
+            return None
+            
+        for task in current_block.tasks:
+            if not task.is_completed():
+                return task.id
         return None
     
     def get_progress(self) -> Dict[str, Any]:
@@ -594,9 +640,9 @@ class ChatGuide:
                 "current_task": "get_age"
             }
         """
-        all_tasks = self._get_all_tasks()
+        all_tasks = self.plan.get_all_tasks()
         total = len(all_tasks)
-        completed = len(self._completed_tasks)
+        completed = len([t for t in all_tasks if t.is_completed()])
         percent = int((completed / total * 100)) if total > 0 else 0
         
         return {
@@ -630,7 +676,7 @@ class ChatGuide:
         for i in range(self.plan.current_index, len(self.plan._blocks)):
             block = self.plan._blocks[i]
             # Filter out completed tasks
-            pending_in_block = [t for t in block if t not in self._completed_tasks]
+            pending_in_block = [t.id for t in block.tasks if not t.is_completed()]
             
             if pending_in_block:
                 blocks.append(pending_in_block)
@@ -660,19 +706,83 @@ class ChatGuide:
         
         Useful for debugging and inspection.
         """
+        tasks_map = {t.id: TaskDefinition(
+            description=t.description,
+            expects=t.expects,
+            tools=t.tools,
+            silent=t.silent
+        ) for t in self.plan.get_all_tasks()}
+        
+        completed_ids = [t.id for t in self.plan.get_all_tasks() if t.is_completed()]
+        
         return PromptBuilder(
             self.state,
             self.plan,
-            self.tasks,
+            tasks_map,
             self.tone,
             self.tone_definitions,
             self.guardrails,
             self.conversation_history,
             self.language,
-            self._completed_tasks
+            completed_ids
         ).build()
 
     
+    def _run_middleware(self, phase: str, context: Dict[str, Any]) -> Dict[str, Any]:
+        """Run middleware hooks."""
+        context['phase'] = phase
+        for middleware in self._middleware:
+            try:
+                context = middleware(context)
+            except Exception as e:
+                print(f"[ERROR] Middleware failed: {e}")
+        return context
+
+    def add_middleware(self, middleware_func: Callable):
+        """Add middleware function."""
+        self._middleware.append(middleware_func)
+
+    def add_task_hook(self, task_id: str, hook_func: Callable):
+        """Add hook for specific task completion."""
+        if task_id not in self._task_hooks:
+            self._task_hooks[task_id] = []
+        self._task_hooks[task_id].append(hook_func)
+
+    def _run_task_hooks(self, task_id: str, value: Any):
+        """Run hooks for a completed task."""
+        if task_id in self._task_hooks:
+            for hook in self._task_hooks[task_id]:
+                try:
+                    hook(task_id, value)
+                except Exception as e:
+                    print(f"[ERROR] Task hook failed for {task_id}: {e}")
+
+    def add_stream_callback(self, callback: Callable):
+        """Add callback for streaming events."""
+        self._stream_callbacks.append(callback)
+
+    def _emit_event(self, event: Dict[str, Any]):
+        """Emit event to all callbacks."""
+        for callback in self._stream_callbacks:
+            try:
+                callback(event)
+            except Exception as e:
+                print(f"[ERROR] Stream callback failed: {e}")
+
+    def get_metrics(self) -> Dict[str, Any]:
+        """Get current metrics."""
+        return self._metrics.copy()
+
+    def reset_metrics(self):
+        """Reset metrics to zero."""
+        self._metrics = {
+            "llm_calls": 0,
+            "tokens_used": 0,
+            "total_duration_ms": 0,
+            "task_completions": 0,
+            "errors": 0
+        }
+
     # ==================== SESSION PERSISTENCE ====================
     
     def checkpoint(self, include_config: bool = False) -> Dict[str, Any]:
@@ -684,6 +794,9 @@ class ChatGuide:
         Returns:
             Serializable checkpoint dict
         """
+        # Collect completed tasks from Plan objects
+        completed_tasks = [t.id for t in self.plan.get_all_tasks() if t.is_completed()]
+        
         checkpoint = {
             "version": "1.0",
             "timestamp": datetime.now().isoformat(),
@@ -693,13 +806,13 @@ class ChatGuide:
             # Core state
             "state": self.state.to_dict(),
             "plan": {
-                "blocks": self.plan._blocks,
+                "blocks": [b.task_ids for b in self.plan._blocks], # Store as IDs for simpler serialization
                 "current_index": self.plan.current_index
             },
             "tone": self.tone,
             
             # Tracking
-            "completed_tasks": self._completed_tasks,
+            "completed_tasks": completed_tasks,
             "execution_status": self._execution_status,
             "data_extractions": self._data_extractions,
             "errors": self._errors,
@@ -714,10 +827,18 @@ class ChatGuide:
         }
         
         if include_config:
+            # Reconstruct tasks config from objects
+            tasks_cfg = {}
+            for task in self.plan.get_all_tasks():
+                tasks_cfg[task.id] = {
+                    "description": task.description,
+                    "expects": task.expects,
+                    "tools": task.tools,
+                    "silent": task.silent
+                }
+                
             checkpoint["config"] = {
-                "tasks": {tid: {"description": t.description, "expects": t.expects, 
-                               "tools": t.tools, "silent": t.silent} 
-                         for tid, t in self.tasks.items()},
+                "tasks": tasks_cfg,
                 "tone_definitions": self.tone_definitions,
                 "guardrails": self.guardrails,
                 "language": self.language
@@ -742,12 +863,57 @@ class ChatGuide:
         
         # Restore core state
         cg.state = State(checkpoint["state"])
-        cg.plan = Plan(checkpoint["plan"]["blocks"])
+        
+        # Restore config if included
+        task_defs = {}
+        if "config" in checkpoint:
+            cfg = checkpoint["config"]
+            for tid, tdata in cfg["tasks"].items():
+                task_defs[tid] = TaskDefinition(**tdata)
+            cg.tone_definitions = cfg["tone_definitions"]
+            cg.guardrails = cfg["guardrails"]
+            cg.language = cfg["language"]
+            
+        # Restore plan
+        # Note: We need task definitions to recreate Task objects
+        # If config is not in checkpoint, we assume tasks are loaded separately or we create dummies
+        # Ideally, user should load_config first if not included, but here we try to restore what we can
+        
+        raw_blocks = checkpoint["plan"]["blocks"]
+        blocks = []
+        completed_ids = checkpoint["completed_tasks"]
+        
+        for raw_block in raw_blocks:
+            tasks = []
+            for task_id in raw_block:
+                # Use definition if available, else dummy
+                if task_id in task_defs:
+                    def_ = task_defs[task_id]
+                    task = Task(
+                        id=task_id,
+                        description=def_.description,
+                        expects=def_.expects,
+                        tools=def_.tools,
+                        silent=def_.silent
+                    )
+                else:
+                    task = Task(id=task_id, description="")
+                
+                # Restore completion status
+                if task_id in completed_ids:
+                    # We don't have the exact value here easily unless we store it in completed_tasks
+                    # For now, we mark as complete with None or look in data_extractions
+                    # Better: look in data_extractions
+                    task.status = "completed"
+                    
+                tasks.append(task)
+            blocks.append(Block(tasks))
+            
+        cg.plan = Plan(blocks)
         cg.plan._current_index = checkpoint["plan"]["current_index"]
         cg.tone = checkpoint["tone"]
         
         # Restore tracking
-        cg._completed_tasks = checkpoint["completed_tasks"]
         cg._execution_status = checkpoint["execution_status"]
         cg._data_extractions = checkpoint["data_extractions"]
         cg._errors = checkpoint["errors"]
@@ -757,15 +923,7 @@ class ChatGuide:
         cg._session_metadata = checkpoint.get("session_metadata", {})
         cg._metrics = checkpoint.get("metrics", {})
         
-        # Restore config if included
-        if "config" in checkpoint:
-            cfg = checkpoint["config"]
-            cg.tasks = {tid: TaskDefinition(**tdata) for tid, tdata in cfg["tasks"].items()}
-            cg.tone_definitions = cfg["tone_definitions"]
-            cg.guardrails = cfg["guardrails"]
-            cg.language = cfg["language"]
-        
-        # Restore fired adjustments (mark them as fired)
+        # Restore fired adjustments
         fired_names = checkpoint.get("fired_adjustments", [])
         for adj in cg.adjustments._adjustments:
             if adj.name in fired_names:
@@ -801,116 +959,4 @@ class ChatGuide:
         """
         with open(path, 'r') as f:
             checkpoint = json.load(f)
-        
-        cg = cls.from_checkpoint(checkpoint, api_key=api_key, debug=debug)
-        
-        if cg.logger:
-            cg.logger.checkpoint_loaded(path, cg._session_id)
-        
-        return cg
-    
-    def set_session_id(self, session_id: str):
-        """Set session identifier for tracking."""
-        self._session_id = session_id
-    
-    def set_session_metadata(self, metadata: Dict[str, Any]):
-        """Set custom session metadata."""
-        self._session_metadata.update(metadata)
-    
-    # ==================== STREAMING SUPPORT ====================
-    
-    def add_stream_callback(self, callback: Callable[[Dict[str, Any]], None]):
-        """Add a streaming callback for real-time events.
-        
-        Callback receives events:
-        - {"type": "task_start", "task_id": "...", "description": "..."}
-        - {"type": "task_complete", "task_id": "...", "key": "...", "value": "..."}
-        - {"type": "tool_call", "tool": "...", "args": {...}}
-        - {"type": "adjustment_fired", "name": "...", "actions": [...]}
-        - {"type": "error", "error": "...", "context": {...}}
-        - {"type": "llm_response", "reply": "...", "was_silent": false}
-        """
-        self._stream_callbacks.append(callback)
-    
-    def _emit_event(self, event: Dict[str, Any]):
-        """Emit event to all stream callbacks."""
-        for callback in self._stream_callbacks:
-            try:
-                callback(event)
-            except Exception as e:
-                if self.debug:
-                    print(f"[ERROR] Stream callback failed: {e}")
-    
-    # ==================== METRICS & TELEMETRY ====================
-    
-    def get_metrics(self) -> Dict[str, Any]:
-        """Get session metrics and telemetry."""
-        return {
-            **self._metrics,
-            "session_duration_s": self._metrics.get("total_duration_ms", 0) / 1000,
-            "avg_response_time_ms": (self._metrics["total_duration_ms"] / self._metrics["llm_calls"]) 
-                                    if self._metrics["llm_calls"] > 0 else 0,
-            "success_rate": ((self._metrics["task_completions"] - self._metrics["errors"]) / 
-                           self._metrics["task_completions"]) if self._metrics["task_completions"] > 0 else 1.0
-        }
-    
-    def reset_metrics(self):
-        """Reset metrics counters."""
-        self._metrics = {
-            "llm_calls": 0,
-            "tokens_used": 0,
-            "total_duration_ms": 0,
-            "task_completions": 0,
-            "errors": 0
-        }
-    
-    # ==================== MIDDLEWARE & PLUGINS ====================
-    
-    def add_middleware(self, middleware: Callable[[Dict[str, Any]], Dict[str, Any]]):
-        """Add middleware function that runs before/after each turn.
-        
-        Middleware signature: func(context: dict) -> dict
-        Context includes: state, plan, current_task, etc.
-        Middleware can modify context and return it.
-        """
-        self._middleware.append(middleware)
-    
-    def add_task_hook(self, task_id: str, hook: Callable[[str, Any], None]):
-        """Add hook that runs when a specific task completes.
-        
-        Hook signature: func(task_id: str, value: Any) -> None
-        """
-        if task_id not in self._task_hooks:
-            self._task_hooks[task_id] = []
-        self._task_hooks[task_id].append(hook)
-    
-    def _run_middleware(self, phase: str, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Run middleware chain.
-        
-        Args:
-            phase: "before" or "after"
-            context: Current execution context
-        
-        Returns:
-            Modified context
-        """
-        context["phase"] = phase
-        for middleware in self._middleware:
-            try:
-                result = middleware(context)
-                if result:
-                    context = result
-            except Exception as e:
-                if self.debug:
-                    print(f"[ERROR] Middleware failed: {e}")
-        return context
-    
-    def _run_task_hooks(self, task_id: str, value: Any):
-        """Run hooks for a specific task."""
-        if task_id in self._task_hooks:
-            for hook in self._task_hooks[task_id]:
-                try:
-                    hook(task_id, value)
-                except Exception as e:
-                    if self.debug:
-                        print(f"[ERROR] Task hook failed for {task_id}: {e}")
+        return cls.from_checkpoint(checkpoint, api_key, debug)

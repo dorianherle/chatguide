@@ -34,32 +34,41 @@ tasks:
 **Run it in Python:**
 ```python
 from chatguide import ChatGuide
+import os
 
-cg = ChatGuide(api_key="your_key")
-cg.load_config("config.yaml")
+# One-line initialization
+cg = ChatGuide(
+    api_key=os.environ["GEMINI_API_KEY"],
+    config="config.yaml"
+)
 
 # Start conversation
 reply = cg.chat()
-print(reply.assistant_reply)  # "Hi! Welcome..."
+print(reply.text)  # "Hi! Welcome..."
 
 # User responds
 cg.add_user_message("I'm John")
 reply = cg.chat()
-print(reply.assistant_reply)  # "Nice to meet you John! What's your email?"
+print(reply.text)  # "Nice to meet you John! What's your email?"
 
 # Check progress anytime
 print(cg.get_progress())  # {"completed": 2, "total": 4, "percent": 50}
-print(cg.state.to_dict())  # {"user_name": "John"}
+
+# Access state with Pythonic syntax
+print(cg.state.user_name)  # "John"
+print(cg.state.variables)  # {"user_name": "John"}
 ```
 
 That's it. No conversation state management, no progress tracking, no session handling—it's all automatic.
 
 ## What You Get
 
-- **Session Persistence** - Save and restore conversations with full state
+- **4-Layer Data Architecture** - Clean separation: Variables, Context, Execution, Audit
+- **Pythonic State Access** - `state.user_name` instead of `state.get("user_name")`
+- **Session Persistence** - Save and restore with `dump()` / `load()`
 - **Progress Tracking** - Know exactly where you are in any conversation
 - **Real-Time Updates** - Stream events for live UI updates
-- **State Inspection** - See what data has been collected and what's missing
+- **Audit Trail** - Searchable history of all state changes
 - **Reactive Flows** - Conversation adjusts based on extracted data
 - **Metrics Built-in** - Track LLM calls, tokens, timing, errors
 - **Production Ready** - Structured logging, error tracking, middleware hooks
@@ -80,11 +89,19 @@ python example_chat.py
 
 ## Core Concepts
 
-### State
-Flat dictionary storing all variables:
+### State (Variables)
+Pythonic access to your business data:
 ```python
+# Pythonic (recommended)
+state.user_name = "John"
+print(state.user_name)  # "John"
+
+# Traditional (still works)
 state.set("user_name", "John")
 state.get("user_name")  # "John"
+
+# Get all variables
+state.variables  # {"user_name": "John", ...}
 ```
 
 Use `{{templates}}` anywhere:
@@ -300,36 +317,48 @@ Flow:
 
 ```python
 from chatguide import ChatGuide
+import os
 
-# Initialize
-cg = ChatGuide(api_key="your_key")
-cg.load_config("config.yaml")
+# Initialize with config
+cg = ChatGuide(
+    api_key=os.environ["GEMINI_API_KEY"],
+    config="config.yaml"
+)
 
 # Chat
 reply = cg.chat()
-print(reply.assistant_reply)
+print(reply.text)  # Shorter alias for assistant_reply
 
 # Add user message
 cg.add_user_message("My name is John")
 reply = cg.chat()
 
-# Check state (just extracted data)
-print(cg.state.to_dict())  # {'user_name': 'John', ...}
+# Access state with Pythonic syntax
+print(cg.state.user_name)  # "John"
+print(cg.state.variables)  # {'user_name': 'John', ...}
 
-# Get comprehensive execution state (10/10 visibility)
+# Access the 4 data layers
+print(cg.execution.status)  # "awaiting_input"
+print(cg.execution.completed)  # ["greet", "get_name"]
+print(cg.context.history)  # List of Message objects
+print(cg.audit.search(key="user_name"))  # Change history
+
+# Get comprehensive execution state
 state = cg.get_state()
 print(state['execution']['status'])  # "awaiting_input"
 print(state['progress']['completed_count'])  # 2
 print(state['data_coverage']['coverage_percent'])  # 25%
-print(state['metrics'])  # LLM calls, tokens, timing
 
 # Quick progress check
 progress = cg.get_progress()
 print(f"{progress['completed']}/{progress['total']} ({progress['percent']}%)")
 
-# Session persistence
+# Session persistence (4-layer export)
+full_data = cg.dump()
+# {"variables": {...}, "context": {...}, "execution": {...}, "audit": [...]}
 cg.save_checkpoint("session.json")
-# Later:
+
+# Later: restore
 cg2 = ChatGuide.load_checkpoint("session.json", api_key="key")
 
 # Streaming for real-time UIs
@@ -350,18 +379,57 @@ cg.add_task_hook("get_name", on_name_collected)
 
 # Metrics
 metrics = cg.get_metrics()
-print(f"LLM calls: {metrics['llm_calls']}, Success rate: {metrics['success_rate']}")
+print(f"LLM calls: {metrics['llm_calls']}")
+```
+
+## Data Architecture
+
+ChatGuide uses a **4-layer data model** for clean separation and scalability:
+
+### 1. Variables (`state`)
+Business logic data extracted during conversation.
+```python
+cg.state.user_name  # Pythonic access
+cg.state.variables  # Get all: {"user_name": "John", ...}
+```
+
+### 2. Context (`context`)
+Conversation history and session metadata.
+```python
+cg.context.history  # List of Message objects
+cg.context.session_id  # "abc123"
+```
+
+### 3. Execution (`execution`)
+Flow control and progress tracking.
+```python
+cg.execution.status  # "awaiting_input"
+cg.execution.completed  # ["greet", "get_name"]
+cg.execution.progress(total_tasks=5)  # {"completed": 2, "percent": 40}
+```
+
+### 4. Audit (`audit`)
+Searchable change history.
+```python
+cg.audit.search(key="user_name")
+# [{"timestamp": "...", "task": "get_name", "old": null, "new": "John"}]
+```
+
+**Export all layers:**
+```python
+full_data = cg.dump()
+# {"variables": {...}, "context": {...}, "execution": {...}, "audit": [...]}
 ```
 
 ## Architecture Principles
 
-1. **State is single source of truth** - Everything flows through it
-2. **Tasks are LLM-driven** - Reasoning, language, decisions
-3. **Tools are runtime-driven** - Deterministic actions
-4. **Args resolved from state** - `{{var}}` templates
-5. **Tools write to state** - Automatic state updates
-6. **Multi-tool tasks allowed** - Sequential execution
-7. **Adjustments control reactivity** - Watch state, modify plan/tone
+1. **4-Layer Separation** - Variables, Context, Execution, Audit
+2. **Pythonic Access** - `state.var` instead of `state.get("var")`
+3. **Tasks are LLM-driven** - Reasoning, language, decisions
+4. **Tools are runtime-driven** - Deterministic actions
+5. **Args resolved from state** - `{{var}}` templates
+6. **Adjustments control reactivity** - Watch state, modify plan/tone
+7. **Audit everything** - Full change history for debugging
 8. **Tone never affects logic** - Purely expressive
 
 ## Project Structure
@@ -659,11 +727,13 @@ Full-featured web UI showcasing all ChatGuide capabilities.
 ChatGuide API Reference:
 
 Core Classes:
-- ChatGuide(api_key, debug=False, language="en", log_format="json", log_file=None)
-  - load_config(path)
+- ChatGuide(api_key=None, config=None, debug=False, language="en", log_format="json", log_file=None)
+  - config: Optional path to YAML config file (auto-loads if provided)
+  - load_config(path)  # Alternative to config parameter
   - chat() / chat_async() → ChatGuideReply
   - add_user_message(message)
-  - get_state() → dict with execution/progress/tasks/data/metrics
+  - get_state() → dict with execution/progress/tasks/data
+  - dump() → {variables, context, execution, audit}  # NEW: 4-layer export
   - get_progress() → {completed, total, percent, current_task}
   - get_current_task() → str
   - get_next_tasks(limit=3) → list[str]
@@ -682,13 +752,57 @@ Core Classes:
   - get_prompt() → str
   - add_middleware(middleware_func)
   - add_task_hook(task_id, hook_func)
+  # NEW: 4-layer architecture access
+  - state → State (business variables)
+  - context → Context (conversation history)
+  - execution → ExecutionState (flow control)
+  - audit → AuditLog (change tracking)
 
-- State()
+- State()  # Enhanced with Pythonic access
+  - state.variable_name  # NEW: Pythonic access (recommended)
+  - state.variable_name = value  # NEW: Pythonic setter
   - get(key, default=None)
-  - set(key, value)
-  - update(dict)
+  - set(key, value, source_task=None)  # NEW: source_task for audit
+  - update(dict, source_task=None)
+  - variables → dict  # NEW: Get all business data
   - resolve_template(template) → resolves {{var}} patterns
   - to_dict() → dict
+
+- Context()  # NEW: Conversation history
+  - history → list[Message]
+  - session_id → str
+  - metadata → dict
+  - add_message(role, content)
+  - get_history_dict() → list[dict]
+  - to_dict() → dict
+
+- ExecutionState()  # NEW: Flow control
+  - status → str  # "idle" | "processing" | "awaiting_input" | "complete"
+  - current_task → str
+  - completed → list[str]
+  - mark_complete(task_id)
+  - is_completed(task_id) → bool
+  - progress(total_tasks) → {completed, total, percent, current_task}
+  - to_dict() → dict
+
+- AuditLog()  # NEW: Change tracking
+  - search(key=None, task=None, since=None) → list[dict]
+  - get_latest(key) → dict
+  - to_list() → list[dict]
+
+- Plan(blocks: list[list[str]])
+  - get_current_block() → Block
+  - advance()
+  - jump_to(index)
+  - insert_block(index, tasks)
+  - remove_block(index)
+  - is_finished() → bool
+
+- ChatGuideReply
+  - text → str  # NEW: Alias for assistant_reply
+  - assistant_reply → str
+  - task_results → list[TaskResult]
+  - tools → list[ToolCall]
 
 - Plan(blocks: list[list[str]])
   - get_current_block() → list[str]

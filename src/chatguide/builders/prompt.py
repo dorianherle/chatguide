@@ -43,7 +43,13 @@ class PromptBuilder:
     
     def build(self) -> str:
         """Build complete prompt with language support."""
-        current_tasks = self.plan.get_current_block()
+        current_block = self.plan.get_current_block()
+        
+        # Extract task IDs from Block object
+        if hasattr(current_block, 'task_ids'):
+            task_ids = current_block.task_ids
+        else:
+            task_ids = current_block or []
         
         return f'''{self._get_lang("language_instruction", "Speak naturally.")}
 
@@ -57,7 +63,7 @@ class PromptBuilder:
 {self.guardrails}
 
 {self._get_lang("current_tasks_header", "CURRENT TASKS:")}
-{self._format_tasks(current_tasks)}
+{self._format_tasks(task_ids)}
 
 {self._get_lang("tone_header", "TONE:")}
 {self._format_tone()}

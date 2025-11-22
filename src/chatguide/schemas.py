@@ -20,9 +20,9 @@ class ToolCall(BaseModel):
 
 class TaskResult(BaseModel):
     """Task execution result from LLM."""
-    task_id: str
     key: str
     value: str
+
 
 
 class ChatGuideReply(BaseModel):
@@ -30,3 +30,8 @@ class ChatGuideReply(BaseModel):
     assistant_reply: str
     task_results: List[TaskResult] = []
     tools: List[ToolCall] = []
+    
+    @property
+    def text(self) -> str:
+        """Alias for assistant_reply (shorter, more intuitive)."""
+        return self.assistant_reply
