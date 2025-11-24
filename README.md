@@ -1,8 +1,19 @@
 # ChatGuide
 
-![ChatGuide](src/chatguide/static/chatguide.png)
+![ChatGuide](python/src/chatguide/static/chatguide.png)
 
 Build conversational AI that actually knows where it is in the conversation.
+
+## Monorepo Structure
+
+This repository contains both Python and JavaScript/TypeScript implementations:
+
+- **`python/`** - Original Python implementation (full-featured library)
+- **`js/`** - TypeScript/JavaScript implementation (optimized for Netlify/serverless)
+- **`configs/`** - Shared YAML configuration files
+- **`netlify/`** - Netlify deployment files (Functions + Frontend)
+
+Both implementations share the same core logic and use the same config format.
 
 ChatGuide manages your conversation flow and state so you can focus on building great experiences. Define your conversation in YAML, let the LLM handle language understanding, and get automatic progress tracking, session persistence, and real-time updates out of the box.
 
@@ -39,7 +50,7 @@ import os
 # One-line initialization
 cg = ChatGuide(
     api_key=os.environ["GEMINI_API_KEY"],
-    config="config.yaml"
+    config="configs/config.yaml"
 )
 
 # Start conversation
@@ -684,11 +695,14 @@ See `examples/` directory for complete implementations:
 - Tone changes based on state
 - UI tools (button choices, card swipe animation)
 
-### Interactive Demo (`examples/streamlit_demo.py`)
+### Interactive Demo (`python/examples/streamlit_demo.py`)
 ```bash
-streamlit run examples/streamlit_demo.py
+streamlit run python/examples/streamlit_demo.py
 ```
 Full-featured web UI showcasing all ChatGuide capabilities.
+
+### Netlify Deployment (`netlify/`)
+See [README_NETLIFY.md](README_NETLIFY.md) for deploying to Netlify with the JavaScript version.
 
 ## Architecture
 

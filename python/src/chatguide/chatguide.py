@@ -307,8 +307,15 @@ class ChatGuide:
                 [{"key": tr.key} for tr in reply.task_results]
             )
         
-        # 1. Update state with task results
+        # 1. Update state with task results (deduplicate by key)
+        seen_keys = set()
+        unique_task_results = []
         for task_result in reply.task_results:
+            if task_result.key not in seen_keys:
+                seen_keys.add(task_result.key)
+                unique_task_results.append(task_result)
+        
+        for task_result in unique_task_results:
             # Emit task complete event
             self._emit_event({
                 "type": "task_complete",

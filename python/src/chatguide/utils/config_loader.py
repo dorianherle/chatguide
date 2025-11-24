@@ -117,7 +117,10 @@ def parse_tones(data: dict) -> Dict[str, str]:
 
 def parse_guardrails(data: dict) -> str:
     """Parse guardrails from config."""
-    guardrails = data.get("guardrails", [])
+    guardrails = data.get("guardrails", {})
     if isinstance(guardrails, list):
         return "\n".join(f"- {g}" for g in guardrails)
+    elif isinstance(guardrails, dict):
+        # Format as key: value pairs
+        return "\n".join(f"- {key}: {value}" for key, value in guardrails.items())
     return str(guardrails)

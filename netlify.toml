@@ -1,0 +1,13 @@
+[build]
+  command = "cd js && npm install && npm run build"
+  functions = "netlify/functions"
+  publish = "netlify/public"
+
+[functions]
+  node_bundler = "esbuild"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
