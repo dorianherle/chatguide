@@ -11,13 +11,6 @@ Build conversational AI that actually knows where it is in the conversation.
 cd python && pip install -e .
 ```
 
-**JavaScript/TypeScript:**
-```bash
-npm install chatguide
-# Or from source:
-cd js && npm install && npm run build
-```
-
 ## Quick Start
 
 **1. Define your flow in YAML:**
@@ -75,13 +68,11 @@ print(cg.get_progress())   # {"completed": 2, "total": 4, "percent": 50}
 chatguide/
 ├── python/           # Python package
 │   └── chatguide/    # Main module
-├── js/               # TypeScript package
-│   └── src/          # Source files
 ├── configs/          # Shared YAML configs
 ├── tests/            # Test suite
 └── examples/         # Example applications
-    ├── netlify/      # Serverless deployment
-    └── streamlit_demo.py
+    ├── fastapi_app/  # FastAPI web server
+    └── streamlit_demo.py  # Streamlit UI
 ```
 
 ## Core Concepts
@@ -135,9 +126,20 @@ tones:
 # Run Streamlit demo
 cd examples && streamlit run streamlit_demo.py
 
-# Run Netlify locally
-npx netlify-cli dev
+# Run FastAPI server
+cd examples/fastapi_app && pip install -r requirements.txt && python main.py
+# Then open: http://localhost:8000/static/index.html
 ```
+
+## Deployment
+
+**Recommended for Psychology Apps:**
+- **Railway + FastAPI**: Secure, Python-native, great for healthcare
+- **Render + FastAPI**: Enterprise security, HIPAA-ready
+- **Supabase + FastAPI**: Built-in auth, RLS security, audit logs
+
+**For Prototyping:**
+- **Streamlit Cloud**: Quick demos (not for production psychology apps)
 
 ## License
 
