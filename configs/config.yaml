@@ -25,13 +25,17 @@ tasks:
   # Basic Identity
   get_name:
     description: "ASK the user for their name. Then extract ONLY the user's name (a text name). If they provide a number or off-topic info, return empty string."
-    expects: ["user_name"]
+    expects: [user_name]
   get_age:
-    description: "ASK the user for their age. Extract the age as a number. CRITICAL: Extract ANY number the user provides, even if it's just digits like '12', '25', '100', '112'. Do NOT require full sentences - if user says '12' or '100', extract it immediately. Only return empty string if there's NO number in the response."
-    expects: ["age"]
+    description: "ASK the user for their age. Extract the age as a number between 1-120. If the number seems unrealistic (like 102 for someone chatting online), politely ask them to confirm or correct it. Only return empty string if there's NO number in the response."
+    expects:
+      - key: age
+        type: number
+        min: 1
+        max: 120
   get_origin:
     description: "ASK the user for their country of origin. Then extract ONLY the user's country of origin (a country name). If they provide other info, return empty string."
-    expects: ["origin"]
+    expects: [origin]
   
   # The Move
   get_location:
