@@ -171,9 +171,18 @@ CRITICAL RULES:
             lines.append(f"Description: {task.description}")
             
             if task.expects:
-                lines.append(f"Expected to collect: {', '.join(task.expects)}")
+                # Handle both strings and ExpectDefinition objects
+                expects_strs = []
+                for exp in task.expects:
+                    if hasattr(exp, 'key'):
+                        expects_strs.append(str(exp.key))
+                    else:
+                        expects_strs.append(str(exp))
+                        
+                lines.append(f"Expected to collect: {', '.join(expects_strs)}")
+                
                 # Add explicit examples for age extraction
-                if "age" in task.expects:
+                if "age" in expects_strs:
                     lines.append("EXAMPLES: User says '12' -> extract age='12'. User says '100' -> extract age='100'. User says 'I am 25' -> extract age='25'. Extract ANY number!")
             
             if task.tools:
