@@ -4,10 +4,13 @@ ChatGuide FastAPI App - Minimal serverless-like API
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 import os
 import uuid
+from pathlib import Path
 from dotenv import load_dotenv
 
 # Import ChatGuide
@@ -27,6 +30,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Static files directory
+STATIC_DIR = Path(__file__).parent / "static"
+
+# Project root and config path
+PROJECT_ROOT = Path(__file__).parent.parent.parent  # chatguide/
+CONFIG_PATH = str(PROJECT_ROOT / "configs" / "config.yaml")
+
+# Mount static files
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+# Root redirect to static index
+@app.get("/")
+async def root():
+    """Redirect to the chat interface"""
+    return FileResponse(STATIC_DIR / "index.html")
+
 # In-memory session storage (use Redis/database for production)
 chat_sessions: Dict[str, Dict[str, Any]] = {}
 
@@ -40,7 +59,7 @@ class ChatResponse(BaseModel):
     session_id: str
     progress: Dict[str, Any]
     finished: bool
-    task_results: Optional[Dict[str, Any]] = None
+    task_results: Optional[Any] = None
 
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
@@ -60,15 +79,15 @@ async def chat(request: ChatRequest):
             # Initialize new ChatGuide
             cg = ChatGuide(
                 api_key=api_key,
-                config="configs/config.yaml"
+                config=CONFIG_PATH
             )
 
             # Get initial response
-            reply = cg.chat()
+            reply = await cg.chat_async()
 
-            # Store session
+            # Store session checkpoint
             chat_sessions[session_id] = {
-                "chatguide": cg.dump(),
+                "checkpoint": cg.checkpoint(include_config=True),
                 "session_id": session_id
             }
 
@@ -80,24 +99,23 @@ async def chat(request: ChatRequest):
                 task_results=getattr(reply, 'task_results', None)
             )
 
-        # Restore ChatGuide from session
-        cg = ChatGuide(
-            api_key=api_key,
-            config="configs/config.yaml"
+        # Restore ChatGuide from session checkpoint
+        cg = ChatGuide.from_checkpoint(
+            checkpoint=session_data["checkpoint"],
+            api_key=api_key
         )
-        cg.restore_from_dump(session_data["chatguide"])
 
         if request.action == "init":
-            reply = cg.chat()
+            reply = await cg.chat_async()
         elif request.message:
             cg.add_user_message(request.message)
-            reply = cg.chat()
+            reply = await cg.chat_async()
         else:
             raise HTTPException(status_code=400, detail="Message required for chat action")
 
-        # Update session
+        # Update session checkpoint
         chat_sessions[session_id] = {
-            "chatguide": cg.dump(),
+            "checkpoint": cg.checkpoint(include_config=True),
             "session_id": session_id
         }
 
@@ -106,7 +124,8 @@ async def chat(request: ChatRequest):
             session_id=session_id,
             progress=cg.get_progress(),
             finished=cg.is_finished(),
-            task_results=getattr(reply, 'task_results', None)
+            task_results=getattr(reply, 'task_results', None),
+            state_data=cg.state.to_dict()
         )
 
     except Exception as e:

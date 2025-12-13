@@ -115,6 +115,7 @@
         }
 
         async function sendMessage(message, action = 'chat') {
+            let data = null;
             try {
                 sendBtn.disabled = true;
                 messageInput.disabled = true;
@@ -135,7 +136,7 @@
                     throw new Error(`HTTP ${response.status}`);
                 }
 
-                const data = await response.json();
+                data = await response.json();
 
                 // Update session
                 sessionId = data.session_id;
@@ -156,6 +157,7 @@
                     messageInput.disabled = true;
                     sendBtn.disabled = true;
                     addMessage('Conversation completed! 🎉', 'assistant');
+                    return;
                 }
 
             } catch (error) {

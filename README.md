@@ -71,8 +71,7 @@ chatguide/
 ├── configs/          # Shared YAML configs
 ├── tests/            # Test suite
 └── examples/         # Example applications
-    ├── fastapi_app/  # FastAPI web server
-    └── streamlit_demo.py  # Streamlit UI
+    └── fastapi_app/  # FastAPI web server
 ```
 
 ## Core Concepts
@@ -123,9 +122,6 @@ tones:
 ## Examples
 
 ```bash
-# Run Streamlit demo
-cd examples && streamlit run streamlit_demo.py
-
 # Run FastAPI server
 cd examples/fastapi_app && pip install -r requirements.txt && python main.py
 # Then open: http://localhost:8000/static/index.html
@@ -137,9 +133,6 @@ cd examples/fastapi_app && pip install -r requirements.txt && python main.py
 - **Railway + FastAPI**: Secure, Python-native, great for healthcare
 - **Render + FastAPI**: Enterprise security, HIPAA-ready
 - **Supabase + FastAPI**: Built-in auth, RLS security, audit logs
-
-**For Prototyping:**
-- **Streamlit Cloud**: Quick demos (not for production psychology apps)
 
 ## License
 

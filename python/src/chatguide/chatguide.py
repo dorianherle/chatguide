@@ -68,13 +68,6 @@ class ChatGuide:
         self._errors: List[Dict[str, Any]] = []
         self._retry_count: int = 0
         
-        # Session persistence attributes
-        self._session_id: Optional[str] = None
-        self._session_metadata: Dict[str, Any] = {}
-        self._execution_status: str = "idle"
-        self._data_extractions: List[Dict[str, Any]] = []
-        self.conversation_history: List[Dict[str, str]] = []
-        
         # Streaming callbacks
         self._stream_callbacks: List[Callable] = []
         
@@ -831,7 +824,7 @@ class ChatGuide:
             "data_extractions": self._data_extractions,
             "errors": self._errors,
             "retry_count": self._retry_count,
-            "context": self.context.to_dict(),  # Save full context with history
+            "conversation_history": self.conversation_history,
             
             # Adjustments state
             "fired_adjustments": [adj.name for adj in self.adjustments._adjustments if adj.fired],
@@ -932,11 +925,7 @@ class ChatGuide:
         cg._data_extractions = checkpoint["data_extractions"]
         cg._errors = checkpoint["errors"]
         cg._retry_count = checkpoint["retry_count"]
-        
-        # Restore context (conversation history)
-        if "context" in checkpoint:
-            cg.context = Context.from_dict(checkpoint["context"])
-        
+        cg.conversation_history = checkpoint["conversation_history"]
         cg._session_id = checkpoint.get("session_id")
         cg._session_metadata = checkpoint.get("session_metadata", {})
         cg._metrics = checkpoint.get("metrics", {})
