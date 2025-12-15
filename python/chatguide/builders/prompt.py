@@ -22,6 +22,7 @@ class PromptView:
     language: str = "en"
     next_block_task: Optional[Task] = None  # First task of next block
     recent_extractions: List[Dict[str, Any]] = None  # Last N extractions for corrections
+    last_error: Optional[str] = None  # Validation error from previous response
 
 
 # ============================================================
@@ -75,32 +76,35 @@ class PromptBuilder:
     def _system_role(self) -> str:
         return self._get_lang(
             "language_instruction",
-            """You are a helpful conversational assistant. Follow these guidelines:
+            """You are Sol, a warm and intelligent AI companion.
 
-CONVERSATIONAL STYLE:
-- Respond naturally and vary your acknowledgments (avoid repetitive phrases like "Okay, [name]")
-- Keep responses conversational and engaging
-- Don't repeat the same acknowledgment patterns
-- Transition smoothly between topics
+CRITICAL STYLE RULES:
+1. VARIETY IS MANDATORY:
+   - Do NOT start sentences with "Ah,", "Oh,", "That's great!", "Nice to meet you".
+   - Do NOT repeat the user's name in every single message. Use it rarely.
+   - Do NOT mirror the user's sentence structure back to them.
 
-EXTRACTION HANDLING:
-- If user gives irrelevant or unextractable information, acknowledge it briefly and rephrase your question
-- Don't get stuck repeating the same question - vary your approach
-- If user is being difficult or giving nonsense, stay professional and try to redirect
-- Progress the conversation even when extraction fails
+2. CONVERSATION FLOW:
+   - React specifically to the content. If they say "Switzerland", mention a specific detail about Switzerland (e.g., Cantons, Alps) rather than just "Beautiful country".
+   - Keep it concise.
+   - If you need to ask a question, blend it into the conversation naturally, don't just interrogate.
 
-GENERAL RULES:
-- Stay in character and maintain helpful tone
-- Be patient with users who give unexpected responses
-- Always provide value in your responses"""
+3. REALISM:
+   - If the user gives a suspicious answer (like living in a place for 200 years), react with surprise, skepticism, or humor. Do not blindly accept it.
+"""
         )
 
     def _context_section(self) -> str:
         return f"""
 CONTEXT
 -------
-Conversation history (reference for context, but vary your responses):
+Conversation history:
 {self._format_history()}
+
+STYLE CHECK:
+Look at the last message in history.
+- If you started the last message with "Ah," or "Great,", you are FORBIDDEN from doing it again now.
+- If you used the user's name in the last message, do NOT use it in this one.
 
 Known facts (verified — do NOT re-ask):
 {self._format_state()}
@@ -115,9 +119,20 @@ CONVERSATION TIPS:
 """.strip()
 
     def _objective_section(self) -> str:
+        error_instruction = ""
+        if self.view.last_error:
+            error_instruction = f"""
+CRITICAL INSTRUCTION - VALIDATION FAILED:
+{self.view.last_error}
+You MUST inform the user why their previous answer was invalid and ask for a valid value.
+Do NOT acknowledge the invalid value as if it were true.
+"""
+
         return f"""
 OBJECTIVE
 ---------
+{error_instruction}
+
 Current task:
 {self._format_current_task()}
 

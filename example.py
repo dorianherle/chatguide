@@ -27,7 +27,7 @@ CONFIG = {
         },
         "get_age": {
             "description": "Ask for the user's age",
-            "expects": [{"key": "age", "type": "number", "min": 1, "max": 120}]
+            "expects": [{"key": "age", "type": "number", "min": 18, "max": 110}]
         },
         "farewell": {
             "description": "Say goodbye and summarize what you learned",

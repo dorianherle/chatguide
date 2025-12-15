@@ -106,17 +106,71 @@ def get_file_category(file_path: Path) -> str:
 
     return "OTHER"
 
-def export():
-    script_dir = Path(__file__).parent
-    output_file = script_dir / "chatguide_full_codebase.txt"
+def get_python_category(file_path: Path, python_dir: Path) -> str:
+    """Categorize Python files in the python directory."""
+    try:
+        rel_path = file_path.relative_to(python_dir)
+        path_str = str(rel_path)
+        # Normalize path separators for consistent matching
+        norm_path = path_str.replace('\\', '/')
+    except ValueError:
+        return "OTHER"
 
-    code_files = get_code_files(script_dir)
+    # Core ChatGuide package files
+    if norm_path.startswith('chatguide/'):
+        if norm_path.startswith('chatguide/core/'):
+            return "CORE_ENGINE"
+        elif norm_path.startswith('chatguide/builders/'):
+            return "BUILDERS"
+        elif norm_path.startswith('chatguide/io/'):
+            return "IO_LAYER"
+        elif norm_path.startswith('chatguide/tools/'):
+            return "TOOLS"
+        elif norm_path.startswith('chatguide/utils/'):
+            return "UTILITIES"
+        elif norm_path.startswith('chatguide/') and not norm_path.endswith('__init__.py'):
+            return "CORE_PACKAGE"
+
+    # Scripts
+    if norm_path.startswith('scripts/'):
+        return "SCRIPTS"
+
+    # Package metadata
+    if '.egg-info' in norm_path:
+        return "PACKAGE_METADATA"
+
+    # Root level Python files
+    if len(rel_path.parts) == 1 and rel_path.name.endswith('.py'):
+        return "ROOT_SCRIPTS"
+
+    return "OTHER"
+
+def export_python_only():
+    script_dir = Path(__file__).parent
+    python_dir = script_dir / "python"
+    output_file = script_dir / "chatguide_python_codebase.txt"
+
+    if not python_dir.exists():
+        print(f"Error: {python_dir} not found")
+        return 1
+
+    # Only get Python files (.py) from the python directory
+    code_files = []
+    for root, dirs, files in os.walk(python_dir):
+        # Skip unwanted directories
+        dirs[:] = [d for d in dirs if not d.startswith('.') and d not in {'__pycache__'}]
+
+        for file in files:
+            if file.endswith('.py'):
+                code_files.append(Path(root) / file)
+
+    code_files = sorted(code_files)
     print(f"Found {len(code_files)} code files")
 
-    # Group files by category
+    # Group files by category (simplified for Python-only export)
     categorized_files = {}
     for file_path in code_files:
-        category = get_file_category(file_path)
+        category = get_python_category(file_path, python_dir)
         if category not in categorized_files:
             categorized_files[category] = []
         categorized_files[category].append(file_path)
@@ -125,12 +179,12 @@ def export():
     total_size = sum(get_file_info(f)['size'] for f in code_files)
     total_lines = sum(get_file_info(f)['lines'] for f in code_files)
 
-    content = [f"ChatGuide FULL Codebase Export - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"]
+    content = [f"ChatGuide PYTHON Codebase Export - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"]
     content.append("=" * 80 + "\n\n")
 
     content.append("SUMMARY\n")
     content.append("-" * 30 + "\n")
-    content.append(f"Total files: {len(code_files)}\n")
+    content.append(f"Total Python files: {len(code_files)}\n")
     content.append(f"Total size: {total_size:,} bytes ({total_size/1024:.1f} KB)\n")
     content.append(f"Total lines: {total_lines:,}\n\n")
 
@@ -152,8 +206,8 @@ def export():
 
         for file_path in sorted(files):
             info = get_file_info(file_path)
-            rel_path = file_path.relative_to(script_dir)
-            content.append(f"  {rel_path}\n")
+            rel_path = file_path.relative_to(python_dir)
+            content.append(f"  python/{rel_path}\n")
             content.append(f"    Size: {info['size']:,} bytes | Lines: {info['lines']} | Modified: {info['modified']}\n")
 
     content.append("\n\n" + "="*80 + "\n")
@@ -167,11 +221,11 @@ def export():
 
         for file_path in sorted(files):
             info = get_file_info(file_path)
-            rel_path = file_path.relative_to(script_dir)
-            print(f"  [{category}] {rel_path} ({info['lines']} lines)")
+            rel_path = file_path.relative_to(python_dir)
+            print(f"  [{category}] python/{rel_path} ({info['lines']} lines)")
 
             content.append(f"{'-'*60}\n")
-            content.append(f"FILE: {rel_path}\n")
+            content.append(f"FILE: python/{rel_path}\n")
             content.append(f"CATEGORY: {category}\n")
             content.append(f"STATS: {info['lines']} lines, {info['size']:,} bytes\n")
             content.append(f"MODIFIED: {info['modified']}\n")
@@ -190,10 +244,10 @@ def export():
             content.append("-" * 80 + "\n\n")
 
     output_file.write_text(''.join(content), encoding='utf-8')
-    print(f"\n[SUCCESS] Full codebase exported to: {output_file}")
-    print(f"[STATS] Total: {len(code_files)} files, {total_lines:,} lines, {total_size/1024:.1f} KB")
+    print(f"\n[SUCCESS] Python codebase exported to: {output_file}")
+    print(f"[STATS] Total: {len(code_files)} Python files, {total_lines:,} lines, {total_size/1024:.1f} KB")
 
 if __name__ == "__main__":
-    export()
+    export_python_only()
 
 

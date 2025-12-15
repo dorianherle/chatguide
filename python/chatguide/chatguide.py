@@ -25,6 +25,7 @@ class ChatGuide:
             "block": 0,           # Current block index
             "completed": set(),   # Completed task IDs
             "recent_keys": [],    # Recent keys in order of extraction/correction
+            "last_error": None,   # Store validation errors here
         }
 
         # === STATIC CONFIG (loaded once) ===
@@ -243,6 +244,9 @@ class ChatGuide:
             next_block_task=next_block_task,
             recent_extractions=recent_extractions,
         )
+        # Inject the error into the view manually or add a field
+        view.last_error = self.state.get("last_error")
+
         return PromptBuilder(view).build()
     
     def _make_task(self, task_id: str) -> Optional[Task]:
@@ -272,6 +276,8 @@ class ChatGuide:
     
     def _process_reply(self, reply: ChatGuideReply):
         """Process reply: update state, complete tasks, advance."""
+        self.state["last_error"] = None  # Reset error at start of processing
+
         current_task_id = self._current_task_id()
         if not current_task_id:
             return
@@ -305,11 +311,42 @@ class ChatGuide:
                 if self.debug:
                     print(f"[DEBUG] Added missing result for key '{expected_key}' with null value")
 
-        # 3. Update data and track recent keys
+        # 3. VALIDATION & UPDATE (REPLACE YOUR STEP 3 WITH THIS)
         for tr in complete_results:
-            self.state["data"][tr.key] = tr.value
-            if tr.key not in self.state["recent_keys"]:
-                self.state["recent_keys"].append(tr.key)
+            # Skip validation if value is already None
+            if tr.value is None:
+                continue
+
+            # Find the expectation definition for this key
+            expects = current_task_def.get("expects", [])
+
+            # Perform validation
+            is_valid = True
+            error_msg = ""
+
+            # Find the specific ExpectDefinition for this key
+            matching_exp = next((e for e in expects if e.key == tr.key), None)
+
+            if matching_exp:
+                # Use the validate_value method from ExpectDefinition
+                is_valid, error_msg = matching_exp.validate_value(tr.value)
+
+            if is_valid:
+                self.state["data"][tr.key] = tr.value
+                if tr.key not in self.state["recent_keys"]:
+                    self.state["recent_keys"].append(tr.key)
+            else:
+                # VALIDATION FAILED
+                if self.debug:
+                    print(f"[VALIDATION FAIL] Key: {tr.key}, Value: {tr.value}, Error: {error_msg}")
+
+                # 1. Don't save the data (keep it None/old)
+                # 2. Set the error so the Prompt knows to complain
+                self.state["last_error"] = f"User provided '{tr.value}' for '{tr.key}', but that is invalid: {error_msg}. Ask them to correct it."
+
+                # If one fails, we stop processing results to ensure we ask about this one
+                # (Optional: you could collect all errors)
+                break
 
         # 4. Check if current task is complete (all non-null)
         if self._task_is_complete(current_task_id):
