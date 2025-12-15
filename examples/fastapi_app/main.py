@@ -2,6 +2,14 @@
 ChatGuide FastAPI App - Minimal serverless-like API
 """
 
+import sys
+from pathlib import Path
+
+# Add the python directory to path (works from any directory)
+script_dir = Path(__file__).parent
+python_dir = script_dir.parent.parent / 'python'
+sys.path.insert(0, str(python_dir))
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -36,6 +44,7 @@ STATIC_DIR = Path(__file__).parent / "static"
 # Project root and config path
 PROJECT_ROOT = Path(__file__).parent.parent.parent  # chatguide/
 CONFIG_PATH = str(PROJECT_ROOT / "configs" / "config.yaml")
+LOG_FILE = PROJECT_ROOT / "debug_log.json"
 
 # Mount static files
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
@@ -47,7 +56,7 @@ async def root():
     return FileResponse(STATIC_DIR / "index.html")
 
 # In-memory session storage (use Redis/database for production)
-chat_sessions: Dict[str, Dict[str, Any]] = {}
+chat_sessions: Dict[str, ChatGuide] = {}
 
 class ChatRequest(BaseModel):
     message: Optional[str] = None
@@ -60,6 +69,7 @@ class ChatResponse(BaseModel):
     progress: Dict[str, Any]
     finished: bool
     task_results: Optional[Any] = None
+    state_data: Optional[Dict[str, Any]] = None
 
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
@@ -73,62 +83,70 @@ async def chat(request: ChatRequest):
         session_id = request.session_id or str(uuid.uuid4())
 
         # Get or create session
-        session_data = chat_sessions.get(session_id)
+        cg = chat_sessions.get(session_id)
 
-        if request.action == "reset" or session_data is None:
+        if request.action == "reset" or cg is None:
             # Initialize new ChatGuide
             cg = ChatGuide(
                 api_key=api_key,
-                config=CONFIG_PATH
+                config=CONFIG_PATH,
+                debug=True
             )
 
             # Get initial response
-            reply = await cg.chat_async()
+            reply = cg.chat()
 
-            # Store session checkpoint
-            chat_sessions[session_id] = {
-                "checkpoint": cg.checkpoint(include_config=True),
-                "session_id": session_id
+            # Store session
+            chat_sessions[session_id] = cg
+
+            # Convert state to JSON-serializable dict
+            state_dict = {
+                "data": cg.state["data"],
+                "messages": cg.state["messages"],
+                "block": cg.state["block"],
+                "completed": list(cg.state["completed"]),  # Convert set to list
+                "recent_keys": cg.state["recent_keys"]
             }
 
             return ChatResponse(
-                reply=reply.assistant_reply,
+                reply=reply.text,
                 session_id=session_id,
                 progress=cg.get_progress(),
                 finished=cg.is_finished(),
-                task_results=getattr(reply, 'task_results', None)
+                task_results=reply.task_results,
+                state_data=state_dict
             )
 
-        # Restore ChatGuide from session checkpoint
-        cg = ChatGuide.from_checkpoint(
-            checkpoint=session_data["checkpoint"],
-            api_key=api_key
-        )
-
+        # Use existing session
         if request.action == "init":
-            reply = await cg.chat_async()
+            reply = cg.chat()
         elif request.message:
             cg.add_user_message(request.message)
-            reply = await cg.chat_async()
+            reply = cg.chat()
         else:
             raise HTTPException(status_code=400, detail="Message required for chat action")
 
-        # Update session checkpoint
-        chat_sessions[session_id] = {
-            "checkpoint": cg.checkpoint(include_config=True),
-            "session_id": session_id
+        # Convert state to JSON-serializable dict
+        state_dict = {
+            "data": cg.state["data"],
+            "messages": cg.state["messages"],
+            "block": cg.state["block"],
+            "completed": list(cg.state["completed"]),  # Convert set to list
+            "recent_keys": cg.state["recent_keys"]
         }
 
         return ChatResponse(
-            reply=reply.assistant_reply,
+            reply=reply.text,
             session_id=session_id,
             progress=cg.get_progress(),
             finished=cg.is_finished(),
-            task_results=getattr(reply, 'task_results', None),
-            state_data=cg.state.to_dict()
+            task_results=reply.task_results,
+            state_data=state_dict
         )
 
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/health")
@@ -139,3 +157,5 @@ async def health_check():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
+
+

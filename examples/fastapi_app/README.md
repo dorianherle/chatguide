@@ -89,3 +89,5 @@ uvicorn main:app --reload
 - Use proper session storage (Redis/PostgreSQL) for production
 - Add authentication middleware for psychology app
 - Enable HTTPS in production
+
+

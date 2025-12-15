@@ -19,6 +19,7 @@ class State:
         # Use object.__setattr__ to avoid triggering our custom __setattr__
         object.__setattr__(self, '_data', initial or {})
         object.__setattr__(self, '_audit_log', audit_log)
+        object.__setattr__(self, '_recent_keys', [])
     
     def get(self, key: str, default=None) -> Any:
         """Get value from state."""
@@ -28,7 +29,11 @@ class State:
         """Set value in state with optional audit logging."""
         old_value = self._data.get(key)
         self._data[key] = value
-        
+
+        # Track recent keys for corrections
+        if key not in self._recent_keys:
+            self._recent_keys.append(key)
+
         # Log change if audit is enabled
         if self._audit_log and old_value != value:
             self._audit_log.log(key, old_value, value, source_task)
@@ -79,10 +84,18 @@ class State:
     def variables(self) -> Dict[str, Any]:
         """Get clean dict of all variables (business data only)."""
         return self._data.copy()
-    
+
+    def get_recent_extractions(self, limit: int = 10) -> list:
+        """Get recent extractions as list of {key, value} dicts."""
+        recent = self._recent_keys[-limit:]
+        return [{"key": k, "value": self._data[k]} for k in recent if k in self._data]
+
     def to_dict(self) -> Dict[str, Any]:
         """Export state as dict."""
-        return self._data.copy()
+        return {
+            "data": self._data.copy(),
+            "recent_keys": self._recent_keys.copy()
+        }
     
     def __contains__(self, key: str) -> bool:
         """Support 'key in state' syntax."""

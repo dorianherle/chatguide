@@ -4,7 +4,10 @@ import yaml
 from pathlib import Path
 from typing import Dict, Any, List
 from ..schemas import TaskDefinition
-from ..adjustments import Adjustment
+from ..adjustments import (
+    Adjustment, Action, PlanJump, PlanInsertBlock, PlanRemoveBlock, 
+    PlanReplaceBlock, ToneSet, ToneAdd, StateSet
+)
 
 
 def load_config_file(path: str) -> dict:
@@ -50,53 +53,101 @@ def parse_adjustments(data: dict) -> List[Adjustment]:
         condition = adj_data.get("when", "False")
         actions = adj_data.get("actions", [])
         
-        # Convert shorthand actions to full format
+        # Convert actions to full format / objects
         formatted_actions = []
         for action in actions:
             if isinstance(action, str):
                 # Parse shorthand like "plan.remove_block(1)"
-                formatted_actions.append(_parse_action_string(action))
+                obj = _parse_action_string(action)
+                if obj:
+                    formatted_actions.append(obj)
             elif isinstance(action, dict):
-                formatted_actions.append(action)
+                formatted_actions.append(_dict_to_action(action))
         
         adjustments.append(Adjustment(name, condition, formatted_actions))
     
     return adjustments
 
 
-def _parse_action_string(action_str: str) -> Dict[str, Any]:
-    """Parse action strings like 'plan.remove_block(1)' or 'tone.set(["warm"])'."""
+def _dict_to_action(d: Dict[str, Any]) -> Any:
+    """Convert dict action to Action object."""
+    t = d.get("type")
+    if t == "plan.jump_to":
+        return PlanJump(index=d.get("index", 0))
+    elif t == "plan.remove_block":
+        return PlanRemoveBlock(index=d.get("index", 0))
+    elif t == "plan.insert_block":
+        return PlanInsertBlock(index=d.get("index", 0), tasks=d.get("tasks", []))
+    elif t == "plan.replace_block":
+        return PlanReplaceBlock(index=d.get("index", 0), tasks=d.get("tasks", []))
+    elif t == "tone.set":
+        return ToneSet(tones=d.get("tones", []))
+    elif t == "tone.add":
+        return ToneAdd(tone=d.get("tone", ""))
+    elif t == "state.set":
+        return StateSet(key=d.get("key", ""), value=d.get("value"))
+    return d
+
+
+def _parse_action_string(action_str: str) -> Any:
+    """Parse action strings like 'plan.remove_block(1)' into Action objects."""
     import re
+    import ast
     
     # Match pattern: object.method(args)
     match = re.match(r'(\w+)\.(\w+)\((.*)\)', action_str)
     if not match:
-        return {}
+        return None
     
     obj, method, args_str = match.groups()
     action_type = f"{obj}.{method}"
     
     # Parse args
-    result = {"type": action_type}
-    
+    args = {}
     if args_str:
         try:
             # Evaluate args safely
             args_str = args_str.strip()
             if args_str.startswith('[') or args_str.startswith('{'):
                 # List or dict
-                evaluated = eval(args_str, {"__builtins__": {}})
+                evaluated = ast.literal_eval(args_str)
                 if action_type == "tone.set":
-                    result["tones"] = evaluated
+                    args["tones"] = evaluated
                 elif action_type in ["plan.insert_block", "plan.replace_block"]:
-                    result["tasks"] = evaluated
+                    args["tasks"] = evaluated
             else:
                 # Single value (usually index)
-                result["index"] = int(args_str)
-        except:
-            pass
+                args["index"] = int(args_str)
+        except Exception as e:
+            if __debug__:
+                raise ValueError(f"Invalid adjustment action: {action_str}") from e
+            # Silently ignore in production
     
-    return result
+    # Construct object
+    if action_type == "plan.jump_to":
+        return PlanJump(index=args.get("index", 0))
+    elif action_type == "plan.remove_block":
+        return PlanRemoveBlock(index=args.get("index", 0))
+    elif action_type == "plan.insert_block":
+        return PlanInsertBlock(index=args.get("index", 0), tasks=args.get("tasks", []))
+    elif action_type == "plan.replace_block":
+        return PlanReplaceBlock(index=args.get("index", 0), tasks=args.get("tasks", []))
+    elif action_type == "tone.set":
+        return ToneSet(tones=args.get("tones", []))
+    elif action_type == "tone.add":
+        # Argument for tone.add("warm") is strictly a string, not index
+        # But regex parsing put it in 'args_str'. 
+        # For 'tone.add("warm")', eval would return "warm".
+        # Let's fix eval usage for single string
+        if args_str and (args_str.startswith('"') or args_str.startswith("'")):
+             try:
+                 val = ast.literal_eval(args_str)
+                 return ToneAdd(tone=val)
+             except:
+                 pass
+        return ToneAdd(tone=args_str) # Fallback
+    
+    return {"type": action_type, **args} # Fallback legacy dict
 
 
 def parse_tone(data: dict) -> List[str]:

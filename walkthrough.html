@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChatGuide Codebase Walkthrough</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin: 20px auto;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #7f8c8d;
+            font-size: 1.2em;
+            margin-bottom: 40px;
+        }
+
+        .section {
+            margin: 40px 0;
+            padding: 25px;
+            border-left: 5px solid #3498db;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .section h2 {
+            color: #2c3e50;
+            margin-top: 0;
+            font-size: 1.8em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section h3 {
+            color: #34495e;
+            margin-top: 25px;
+            font-size: 1.3em;
+        }
+
+        .code-block {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+            border: 1px solid #4a5568;
+        }
+
+        .file-structure {
+            background: #f8f9fa;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            font-family: 'Consolas', 'Monaco', monospace;
+        }
+
+        .concept-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border: 2px solid rgba(255,255,255,0.2);
+        }
+
+        .concept-box h4 {
+            margin-top: 0;
+            font-size: 1.4em;
+            color: #ffd700;
+        }
+
+        .flow-diagram {
+            text-align: center;
+            margin: 30px 0;
+        }
+
+        .flow-step {
+            display: inline-block;
+            background: #3498db;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 25px;
+            margin: 10px;
+            font-weight: bold;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        .flow-arrow {
+            color: #7f8c8d;
+            font-size: 1.5em;
+            margin: 0 10px;
+        }
+
+        .key-file {
+            background: #e8f5e8;
+            border: 2px solid #4caf50;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+
+        .key-file h4 {
+            color: #2e7d32;
+            margin-top: 0;
+            font-size: 1.2em;
+        }
+
+        .highlight {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+
+        .highlight strong {
+            color: #856404;
+        }
+
+        .code-example {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+
+        .code-example h5 {
+            margin-top: 0;
+            color: #495057;
+            font-size: 1.1em;
+        }
+
+        .emoji {
+            font-size: 1.2em;
+        }
+
+        .nav-links {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(255,255,255,0.9);
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .nav-links a {
+            display: block;
+            color: #2c3e50;
+            text-decoration: none;
+            margin: 5px 0;
+            padding: 5px;
+            border-radius: 5px;
+            transition: background 0.3s;
+        }
+
+        .nav-links a:hover {
+            background: #3498db;
+            color: white;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 50px;
+            padding: 20px;
+            color: #7f8c8d;
+            border-top: 1px solid #dee2e6;
+        }
+
+        @media (max-width: 768px) {
+            .nav-links {
+                position: static;
+                margin: 20px 0;
+            }
+
+            body {
+                padding: 10px;
+            }
+
+            .container {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="nav-links">
+        <a href="#index">📚 Index</a>
+        <a href="#overview">📖 Overview</a>
+        <a href="#architecture">🏗️ Architecture</a>
+        <a href="#dataflow">📊 Data Flow</a>
+        <a href="#core">⚙️ Core Components</a>
+        <a href="#repo-org">📁 Repo Organization</a>
+        <a href="#flow">🔄 How It Works</a>
+        <a href="#getting-started">🚀 Getting Started</a>
+        <a href="#examples">💡 Examples</a>
+    </div>
+
+    <div class="container">
+        <h1>🎯 ChatGuide Walkthrough</h1>
+        <p class="subtitle">A beginner-friendly guide to understanding this conversational AI framework</p>
+
+        <div class="section" id="overview">
+            <h2>📖 What is ChatGuide?</h2>
+            <p>ChatGuide is like a <strong>smart conversation director</strong> that helps AI have structured, goal-oriented chats with users. Instead of just free-form conversation, it guides users through specific steps to collect information or complete tasks.</p>
+
+            <div class="concept-box">
+                <h4>🤖 Think of it like this:</h4>
+                <p>Imagine you're building a pizza ordering app. Instead of asking "What do you want?", ChatGuide helps you ask specific questions in order: "What size pizza?", "What toppings?", "What's your address?", "When do you want delivery?"</p>
+            </div>
+
+            <div class="highlight">
+                <strong>Key Idea:</strong> ChatGuide turns unstructured chat into a structured process. The AI knows exactly what information it needs and when to ask for it.
+            </div>
+        </div>
+
+        <div class="section" id="architecture">
+            <h2>🏗️ The 4-Layer Architecture</h2>
+            <p>ChatGuide is built like a well-organized kitchen. Each part has a specific job:</p>
+
+            <div class="flow-diagram">
+                <div class="flow-step">🧠 LLM (Brain)</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step">📋 Tasks (What to do)</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step">💾 State (What we know)</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step">🔧 Tools (What we can do)</div>
+            </div>
+
+            <div class="concept-box">
+                <h4>🧠 Layer 1: The Brain (LLM)</h4>
+                <p>The AI language model that understands what users say and decides what to do next. It's like the chef who reads the recipe and gives instructions.</p>
+            </div>
+
+            <div class="concept-box">
+                <h4>📋 Layer 2: Tasks (The Recipe)</h4>
+                <p>Step-by-step instructions for the conversation. Each task tells the AI what to ask for and what information to collect.</p>
+            </div>
+
+            <div class="concept-box">
+                <h4>💾 Layer 3: State (The Ingredients)</h4>
+                <p>Stores all the information collected during the conversation. Like a shopping list that gets filled in as you go.</p>
+            </div>
+
+            <div class="concept-box">
+                <h4>🔧 Layer 4: Tools (The Kitchen Tools)</h4>
+                <p>Actions the system can take, like sending emails, saving files, or calling APIs. These are the "doing" parts of the system.</p>
+            </div>
+        </div>
+
+        <div class="section" id="core">
+            <h2>⚙️ Core Components Deep Dive</h2>
+
+            <h3>📁 File Structure</h3>
+            <div class="file-structure">
+python/chatguide/
+├── chatguide.py          # 🏠 Main orchestrator (the "conductor")
+├── schemas.py            # 📋 Data structures (the "blueprints")
+├── state.py              # 💾 Memory storage (the "notebook")
+├── adjustments.py        # 🔄 Dynamic changes (the "detours")
+├── tool_executor.py      # 🔧 Tool runner (the "worker")
+├── builders/prompt.py    # 💬 Message builder (the "translator")
+├── io/llm.py            # 🤖 AI connector (the "phone line")
+├── io/storage.py        # 💽 File saver (the "cabinet")
+├── core/
+│   ├── execution.py     # ▶️ Progress tracker (the "timer")
+│   ├── task.py          # 📝 Task manager (the "task list")
+│   └── context.py       # 🌍 Situation awareness (the "radar")
+└── utils/
+    └── response_parser.py # 🔍 Answer reader (the "interpreter")
+            </div>
+
+            <h3>🔑 Key Files Explained</h3>
+
+            <div class="key-file">
+                <h4>🏠 chatguide.py - The Main Director</h4>
+                <p>This is the "boss" file that coordinates everything. It creates all the other components and manages the conversation flow.</p>
+                <div class="code-example">
+                    <h5>What it does:</h5>
+                    <pre class="code-block">class ChatGuide:
+    def __init__(self):
+        self.state = State()        # Memory
+        self.plan = Plan()          # Task list
+        self.execution = ExecutionState()  # Progress
+        self.adjustments = Adjustments()   # Dynamic changes
+
+    def chat(self):
+        # 1. Get current task
+        # 2. Build prompt for AI
+        # 3. Send to LLM
+        # 4. Parse response
+        # 5. Update state
+        # 6. Execute tools
+        # 7. Return reply</pre>
+                </div>
+            </div>
+
+            <div class="key-file">
+                <h4>📋 schemas.py - The Data Blueprints</h4>
+                <p>Defines the structure of data that flows through the system. Like architectural drawings for a building.</p>
+                <div class="code-example">
+                    <h5>Key data types:</h5>
+                    <pre class="code-block">class TaskDefinition:     # What a task looks like
+    description: str      # "Ask for user's name"
+    expects: List[str]    # ["user_name"]
+    tools: List[dict]     # What tools to run
+
+class ChatGuideReply:     # What AI sends back
+    assistant_reply: str  # "What's your name?"
+    task_results: List    # Data collected
+    tools: List           # Actions to take</pre>
+                </div>
+            </div>
+
+            <div class="key-file">
+                <h4>💾 state.py - The Memory Bank</h4>
+                <p>Stores all conversation data like a dictionary that remembers everything the user has told you.</p>
+                <div class="code-example">
+                    <h5>How it works:</h5>
+                    <pre class="code-block">state = State()
+state.set("user_name", "John")
+state.set("user_age", "25")
+
+# Later in conversation...
+name = state.get("user_name")  # Returns "John"</pre>
+                </div>
+            </div>
+
+            <div class="key-file">
+                <h4>🔄 adjustments.py - The Adaptive Brain</h4>
+                <p>Allows the conversation to change based on what happens. Like "if user is sad, switch to supportive mode".</p>
+                <div class="code-example">
+                    <h5>Example adjustment:</h5>
+                    <pre class="code-block"># If user mentions "stressed", switch to calm tone
+adjustment = {
+    "trigger": "stressed",
+    "action": "change_tone",
+    "value": "calm_and_supportive"
+}</pre>
+                </div>
+            </div>
+        </div>
+
+        <div class="section" id="flow">
+            <h2>🔄 How a Conversation Works</h2>
+            <p>Let's trace through what happens when a user says "Hello":</p>
+
+            <div class="flow-diagram">
+                <div class="flow-step">👤 User: "Hello"</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step">📝 Check Current Task</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step">💬 Build AI Prompt</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step">🤖 Send to LLM</div>
+            </div>
+
+            <div class="flow-diagram">
+                <div class="flow-step">📨 Get AI Response</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step">🔍 Parse Reply</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step">💾 Update State</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step">🔧 Run Tools</div>
+            </div>
+
+            <h3>📝 Step-by-Step Breakdown</h3>
+
+            <div class="code-example">
+                <h5>1. User sends message</h5>
+                <pre class="code-block">guide.add_user_message("Hello!")</pre>
+            </div>
+
+            <div class="code-example">
+                <h5>2. System checks what task is next</h5>
+                <pre class="code-block">current_task = execution.get_current_task()
+# Might be: "greet_user" or "ask_name"</pre>
+            </div>
+
+            <div class="code-example">
+                <h5>3. Builds a smart prompt for the AI</h5>
+                <pre class="code-block">prompt = f"""
+You are helping with: {current_task.description}
+User said: {user_message}
+We already know: {state.get_all_data()}
+What should you ask next?
+"""</pre>
+            </div>
+
+            <div class="code-example">
+                <h5>4. AI thinks and responds</h5>
+                <pre class="code-block"># AI response might be:
+{
+  "assistant_reply": "Hi there! What's your name?",
+  "task_results": [{"key": "greeted", "value": "true"}],
+  "tools": []
+}</pre>
+            </div>
+
+            <div class="code-example">
+                <h5>5. System processes the response</h5>
+                <pre class="code-block">state.set("greeted", "true")  # Remember we greeted
+execution.mark_task_complete("greet_user")
+execution.set_current_task("ask_name")</pre>
+            </div>
+        </div>
+
+        <div class="section" id="getting-started">
+            <h2>🚀 Getting Started - Your First ChatGuide</h2>
+
+            <h3>📦 Installation</h3>
+            <div class="code-block">
+cd python
+pip install -r requirements.txt
+            </div>
+
+            <h3>⚡ Quick Test</h3>
+            <div class="code-example">
+                <h5>Create a simple greeting bot:</h5>
+                <pre class="code-block">from chatguide import ChatGuide
+
+# Create your bot
+guide = ChatGuide(api_key="your-gemini-key")
+
+# Add a simple config
+config = {
+    "tasks": [
+        {
+            "description": "Greet the user and ask their name",
+            "expects": ["user_name"],
+            "silent": False
+        }
+    ]
+}
+
+guide.load_config_dict(config)
+
+# Start chatting
+reply = guide.chat()
+print(reply.assistant_reply)  # "Hello! What's your name?"
+
+# User responds
+guide.add_user_message("I'm Alice")
+reply = guide.chat()
+print(reply.assistant_reply)  # "Nice to meet you Alice!"</pre>
+            </div>
+
+            <h3>🌐 Try the Web Demo</h3>
+            <div class="code-example">
+                <h5>Run the FastAPI example:</h5>
+                <pre class="code-block">cd examples/fastapi_app
+pip install -r requirements.txt
+export GEMINI_API_KEY=your_key_here
+python main.py
+
+# Then open: http://localhost:8000/static/index.html</pre>
+            </div>
+        </div>
+
+        <div class="section" id="examples">
+            <h2>💡 Real-World Examples</h2>
+
+            <h3>🍕 Pizza Ordering Bot</h3>
+            <div class="code-example">
+                <h5>Tasks for pizza ordering:</h5>
+                <pre class="code-block">tasks = [
+    {
+        "description": "Ask what size pizza they want",
+        "expects": ["pizza_size"],
+        "tools": []
+    },
+    {
+        "description": "Ask what toppings they want",
+        "expects": ["toppings"],
+        "tools": []
+    },
+    {
+        "description": "Get delivery address",
+        "expects": ["address"],
+        "tools": []
+    },
+    {
+        "description": "Calculate total and confirm order",
+        "expects": [],
+        "tools": ["calculate_price", "send_confirmation"]
+    }
+]</pre>
+            </div>
+
+            <h3>🏥 Medical Intake Form</h3>
+            <div class="code-example">
+                <h5>Healthcare data collection:</h5>
+                <pre class="code-block">tasks = [
+    {
+        "description": "Collect basic patient information",
+        "expects": [
+            {"key": "age", "type": "number", "min": 0, "max": 120},
+            {"key": "symptoms", "type": "enum", "choices": ["fever", "cough", "pain"]}
+        ]
+    },
+    {
+        "description": "Ask about medical history",
+        "expects": ["previous_conditions", "medications"]
+    }
+]</pre>
+            </div>
+
+            <h3>📚 Learning Assessment</h3>
+            <div class="code-example">
+                <h5>Educational quiz system:</h5>
+                <pre class="code-block">tasks = [
+    {
+        "description": "Assess student's understanding of variables",
+        "expects": [
+            {"key": "variable_explanation", "type": "enum",
+             "choices": ["correct", "partially_correct", "incorrect"]}
+        ]
+    },
+    {
+        "description": "Provide personalized feedback",
+        "expects": [],
+        "tools": ["generate_feedback", "suggest_resources"]
+    }
+]</pre>
+            </div>
+        </div>
+
+        <div class="section" id="index">
+            <h2>📚 Comprehensive Index</h2>
+
+            <div class="concept-box">
+                <h4>🗂️ Table of Contents</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div>
+                        <h5>🏗️ Architecture & Design</h5>
+                        <ul style="margin: 0; padding-left: 20px;">
+                            <li><a href="#overview">What is ChatGuide?</a></li>
+                            <li><a href="#architecture">4-Layer Architecture</a></li>
+                            <li><a href="#dataflow">Data Flow Diagrams</a></li>
+                            <li><a href="#repo-org">Repository Organization</a></li>
+                        </ul>
+
+                        <h5>⚙️ Core Components</h5>
+                        <ul style="margin: 0; padding-left: 20px;">
+                            <li><a href="#core">File Structure</a></li>
+                            <li><a href="#chatguide-py">Main Orchestrator</a></li>
+                            <li><a href="#schemas">Data Schemas</a></li>
+                            <li><a href="#state">State Management</a></li>
+                            <li><a href="#adjustments">Dynamic Adjustments</a></li>
+                        </ul>
+                    </div>
+
+                    <div>
+                        <h5>🔄 System Flow</h5>
+                        <ul style="margin: 0; padding-left: 20px;">
+                            <li><a href="#flow">Conversation Flow</a></li>
+                            <li><a href="#task-lifecycle">Task Lifecycle</a></li>
+                            <li><a href="#tool-execution">Tool Execution</a></li>
+                            <li><a href="#state-updates">State Updates</a></li>
+                        </ul>
+
+                        <h5>🚀 Getting Started</h5>
+                        <ul style="margin: 0; padding-left: 20px;">
+                            <li><a href="#getting-started">Installation</a></li>
+                            <li><a href="#examples">Example Projects</a></li>
+                            <li><a href="#quick-start">Quick Start Guide</a></li>
+                            <li><a href="#api-reference">API Reference</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="code-example">
+                <h5>🎯 Quick Jump Map</h5>
+                <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 15px;">
+                    <span style="background: #3498db; color: white; padding: 8px 12px; border-radius: 20px; font-size: 0.9em;">New to ChatGuide? → Start Here</span>
+                    <span style="background: #e74c3c; color: white; padding: 8px 12px; border-radius: 20px; font-size: 0.9em;">Understanding Code? → Core Components</span>
+                    <span style="background: #27ae60; color: white; padding: 8px 12px; border-radius: 20px; font-size: 0.9em;">Building Something? → Examples</span>
+                    <span style="background: #f39c12; color: white; padding: 8px 12px; border-radius: 20px; font-size: 0.9em;">Debugging Issues? → Data Flow</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="section" id="dataflow">
+            <h2>📊 Data Flow & System Architecture</h2>
+
+            <h3>🌊 Complete Data Flow Journey</h3>
+            <p>Understanding how data moves through ChatGuide is key to debugging and extending the system.</p>
+
+            <div class="concept-box">
+                <h4>🔄 Primary Data Flow</h4>
+                <div style="background: white; color: #333; padding: 20px; border-radius: 10px; margin: 15px 0;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+                        <div style="text-align: center; flex: 1;">
+                            <div style="background: #3498db; color: white; padding: 10px; border-radius: 50%; width: 60px; height: 60px; display: inline-flex; align-items: center; justify-content: center; font-size: 1.5em;">👤</div>
+                            <p style="margin: 5px 0; font-weight: bold;">User Input</p>
+                        </div>
+                        <div style="flex: 1; text-align: center;">→</div>
+                        <div style="text-align: center; flex: 1;">
+                            <div style="background: #e74c3c; color: white; padding: 10px; border-radius: 50%; width: 60px; height: 60px; display: inline-flex; align-items: center; justify-content: center; font-size: 1.5em;">📋</div>
+                            <p style="margin: 5px 0; font-weight: bold;">Task Router</p>
+                        </div>
+                        <div style="flex: 1; text-align: center;">→</div>
+                        <div style="text-align: center; flex: 1;">
+                            <div style="background: #27ae60; color: white; padding: 10px; border-radius: 50%; width: 60px; height: 60px; display: inline-flex; align-items: center; justify-content: center; font-size: 1.5em;">💬</div>
+                            <p style="margin: 5px 0; font-weight: bold;">Prompt Builder</p>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <div style="text-align: center; flex: 1;">
+                            <div style="background: #f39c12; color: white; padding: 10px; border-radius: 50%; width: 60px; height: 60px; display: inline-flex; align-items: center; justify-content: center; font-size: 1.5em;">🤖</div>
+                            <p style="margin: 5px 0; font-weight: bold;">LLM Processing</p>
+                        </div>
+                        <div style="flex: 1; text-align: center;">→</div>
+                        <div style="text-align: center; flex: 1;">
+                            <div style="background: #9b59b6; color: white; padding: 10px; border-radius: 50%; width: 60px; height: 60px; display: inline-flex; align-items: center; justify-content: center; font-size: 1.5em;">🔍</div>
+                            <p style="margin: 5px 0; font-weight: bold;">Response Parser</p>
+                        </div>
+                        <div style="flex: 1; text-align: center;">→</div>
+                        <div style="text-align: center; flex: 1;">
+                            <div style="background: #1abc9c; color: white; padding: 10px; border-radius: 50%; width: 60px; height: 60px; display: inline-flex; align-items: center; justify-content: center; font-size: 1.5em;">📤</div>
+                            <p style="margin: 5px 0; font-weight: bold;">Output</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <h3>💾 State Data Flow</h3>
+            <div class="code-example">
+                <h5>How State Changes During Conversation:</h5>
+                <pre class="code-block">// Initial State
+state = {}
+
+// User: "My name is John"
+state = {
+  "user_name": "John"
+}
+
+// User: "I'm 25 years old"
+state = {
+  "user_name": "John",
+  "user_age": "25"
+}
+
+// Task completes, state persists for next conversation
+state = {
+  "user_name": "John",
+  "user_age": "25",
+  "task_greeting_complete": true
+}</pre>
+            </div>
+
+            <h3>🔧 Tool Execution Flow</h3>
+            <div class="code-example">
+                <h5>Tool Call Sequence:</h5>
+                <pre class="code-block">1. LLM decides to call tool:
+   {
+     "tool": "send_email",
+     "options": {
+       "to": "user@example.com",
+       "subject": "Welcome!"
+     }
+   }
+
+2. Tool Registry finds executor:
+   tool_registry.get("send_email") → EmailTool()
+
+3. Tool executes with state data:
+   tool.execute(state.get_all_data())
+
+4. Tool returns result:
+   {"success": true, "message_id": "123"}
+
+5. Result stored in state:
+   state.set("email_sent", "123")</pre>
+            </div>
+
+            <h3>🔄 Adjustment Trigger Flow</h3>
+            <div class="code-example">
+                <h5>Dynamic Behavior Changes:</h5>
+                <pre class="code-block">// Adjustment definition
+{
+  "trigger": "user_mood == 'angry'",
+  "action": "change_tone",
+  "value": "calm_supportive",
+  "priority": 10
+}
+
+// Flow:
+1. User message analyzed
+2. State checked for trigger conditions
+3. If trigger matches → Apply adjustment
+4. Tone changes for next LLM call
+5. Conversation adapts dynamically</pre>
+            </div>
+
+            <div class="highlight">
+                <strong>💡 Data Flow Key Points:</strong>
+                <ul style="margin: 10px 0;">
+                    <li><strong>Unidirectional:</strong> Data flows forward through the pipeline</li>
+                    <li><strong>Stateful:</strong> Important data persists in state between turns</li>
+                    <li><strong>Reactive:</strong> Adjustments can modify flow based on conditions</li>
+                    <li><strong>Extensible:</strong> New tools and adjustments can be added without changing core flow</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section" id="repo-org">
+            <h2>📁 Repository Organization</h2>
+
+            <h3>🏗️ Overall Structure</h3>
+            <div class="file-structure">
+chatguide/
+├── python/                    # 🐍 Main Python package
+│   ├── chatguide/            # 📦 Core library code
+│   ├── examples/             # 💡 Example implementations
+│   ├── tests/                # 🧪 Test suite
+│   └── docs/                 # 📚 Documentation
+├── examples/                 # 🌟 Standalone examples
+│   ├── fastapi_app/         # 🚀 Web API example
+│   └── netlify_function/    # ☁️ Serverless example
+├── docs/                     # 📖 Documentation
+└── configs/                  # ⚙️ Configuration files
+            </div>
+
+            <h3>📦 Python Package Structure</h3>
+            <div class="file-structure">
+python/chatguide/
+├── __init__.py              # 📋 Package initialization
+├── chatguide.py             # 🎭 Main ChatGuide class
+├── schemas.py               # 📋 Data models & validation
+├── state.py                 # 💾 State management
+├── adjustments.py           # 🔄 Dynamic behavior system
+├── tool_executor.py         # 🔧 Tool execution engine
+├── builders/
+│   └── prompt.py           # 💬 AI prompt construction
+├── core/                   # ⚙️ Core system components
+│   ├── execution.py       # ▶️ Conversation flow control
+│   ├── task.py            # 📝 Task management
+│   ├── block.py           # 🧱 Task composition
+│   ├── context.py         # 🌍 Conversation context
+│   └── audit.py           # 📊 Logging & audit trail
+├── io/                     # 🔌 Input/Output interfaces
+│   ├── llm.py            # 🤖 AI model integration
+│   └── storage.py        # 💽 Persistence layer
+├── utils/                  # 🛠️ Utility functions
+│   ├── config_loader.py   # ⚙️ Configuration parsing
+│   ├── response_parser.py # 🔍 AI response processing
+│   ├── logger.py          # 📝 Logging system
+│   └── validation.py      # ✅ Data validation
+└── tools/                  # 🔧 Built-in tools
+    └── registry.py         # 📚 Tool registration
+            </div>
+
+            <h3>🎯 Organization Philosophy</h3>
+
+            <div class="concept-box">
+                <h4>📂 Separation of Concerns</h4>
+                <p><strong>Why this structure?</strong> Each folder has a single responsibility:</p>
+                <ul style="margin: 10px 0;">
+                    <li><strong>core/</strong> - Essential system logic that rarely changes</li>
+                    <li><strong>io/</strong> - External integrations (AI models, databases)</li>
+                    <li><strong>builders/</strong> - Complex object construction logic</li>
+                    <li><strong>utils/</strong> - Helper functions and cross-cutting concerns</li>
+                    <li><strong>tools/</strong> - Extensible functionality for actions</li>
+                </ul>
+            </div>
+
+            <div class="concept-box">
+                <h4>🔧 Extensibility Design</h4>
+                <p><strong>Easy to extend:</strong> Want to add a new AI provider? Just add to <code>io/</code>. New tools? Add to <code>tools/</code>. Custom prompts? Extend <code>builders/</code>.</p>
+            </div>
+
+            <div class="concept-box">
+                <h4>🧪 Testability Focus</h4>
+                <p><strong>tests/</strong> mirrors the main package structure so you can test each component independently. Each module can be mocked and tested in isolation.</p>
+            </div>
+
+            <h3>📋 Key Files by Category</h3>
+
+            <div class="code-example">
+                <h5>🚀 Entry Points:</h5>
+                <ul style="margin: 0;">
+                    <li><code>__init__.py</code> - Public API exports</li>
+                    <li><code>chatguide.py</code> - Main class users instantiate</li>
+                </ul>
+            </div>
+
+            <div class="code-example">
+                <h5>⚙️ Configuration:</h5>
+                <ul style="margin: 0;">
+                    <li><code>schemas.py</code> - Data validation rules</li>
+                    <li><code>utils/config_loader.py</code> - YAML/JSON parsing</li>
+                </ul>
+            </div>
+
+            <div class="code-example">
+                <h5>💾 Data Management:</h5>
+                <ul style="margin: 0;">
+                    <li><code>state.py</code> - In-memory conversation state</li>
+                    <li><code>io/storage.py</code> - Persistent storage (files, DB)</li>
+                    <li><code>core/audit.py</code> - Conversation history</li>
+                </ul>
+            </div>
+
+            <div class="code-example">
+                <h5>🤖 AI Integration:</h5>
+                <ul style="margin: 0;">
+                    <li><code>io/llm.py</code> - AI model communication</li>
+                    <li><code>builders/prompt.py</code> - Prompt engineering</li>
+                    <li><code>utils/response_parser.py</code> - AI response parsing</li>
+                </ul>
+            </div>
+
+            <h3>🔍 Finding What You Need</h3>
+
+            <div class="highlight">
+                <strong>Quick File Lookup Guide:</strong>
+                <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
+                    <tr style="background: #f8f9fa;">
+                        <th style="padding: 10px; border: 1px solid #dee2e6;">I want to...</th>
+                        <th style="padding: 10px; border: 1px solid #dee2e6;">Look in...</th>
+                    </tr>
+                    <tr>
+                        <td style="padding: 10px; border: 1px solid #dee2e6;">Change conversation flow</td>
+                        <td style="padding: 10px; border: 1px solid #dee2e6;"><code>core/execution.py</code></td>
+                    </tr>
+                    <tr style="background: #f8f9fa;">
+                        <td style="padding: 10px; border: 1px solid #dee2e6;">Add new AI model support</td>
+                        <td style="padding: 10px; border: 1px solid #dee2e6;"><code>io/llm.py</code></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 10px; border: 1px solid #dee2e6;">Create custom tool</td>
+                        <td style="padding: 10px; border: 1px solid #dee2e6;"><code>tool_executor.py</code> + <code>tools/</code></td>
+                    </tr>
+                    <tr style="background: #f8f9fa;">
+                        <td style="padding: 10px; border: 1px solid #dee2e6;">Modify data validation</td>
+                        <td style="padding: 10px; border: 1px solid #dee2e6;"><code>schemas.py</code></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 10px; border: 1px solid #dee2e6;">Add new conversation trigger</td>
+                        <td style="padding: 10px; border: 1px solid #dee2e6;"><code>adjustments.py</code></td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🔍 Key Concepts to Remember</h2>
+
+            <div class="concept-box">
+                <h4>🎯 Tasks = Steps in your conversation</h4>
+                <p>Each task is like a chapter in a story. It tells the AI what to focus on and what information to collect.</p>
+            </div>
+
+            <div class="concept-box">
+                <h4>💾 State = The story so far</h4>
+                <p>Everything the user has told you gets stored here. The AI can reference it in future responses.</p>
+            </div>
+
+            <div class="concept-box">
+                <h4>🔄 Adjustments = Plot twists</h4>
+                <p>When something unexpected happens, adjustments let you change the conversation direction.</p>
+            </div>
+
+            <div class="concept-box">
+                <h4>🔧 Tools = Special abilities</h4>
+                <p>Tools let your chatbot do things beyond just talking - send emails, save files, call APIs, etc.</p>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>🚀 <strong>Ready to build your own ChatGuide?</strong> Start with the examples in the <code>examples/</code> folder!</p>
+            <p>💡 <em>Remember: ChatGuide turns chaotic conversations into structured, reliable interactions.</em></p>
+        </div>
+    </div>
+</body>
+</html>

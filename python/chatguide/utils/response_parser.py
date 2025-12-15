@@ -1,4 +1,4 @@
-﻿"""Response parser - parses LLM responses."""
+"""Response parser - parses LLM responses."""
 
 import json
 from typing import Any, List
@@ -14,18 +14,21 @@ def parse_llm_response(raw: Any) -> ChatGuideReply:
         return raw
     
     if isinstance(raw, dict):
-        # Handle task_id field from LLM responses (prompt asks for it but schema doesn't have it)
-        # Also deduplicate by key to prevent duplicate extractions
+        # Handle task_id field from LLM responses
+        # Deduplicate by (task_id, key) pair to allow same key for different tasks
         if "task_results" in raw and isinstance(raw["task_results"], list):
             processed_results = []
-            seen_keys = set()
+            seen = set()
             for tr in raw["task_results"]:
                 if isinstance(tr, dict):
+                    task_id = tr.get("task_id", "")
                     key = tr.get("key", "")
-                    # Skip duplicates
-                    if key and key not in seen_keys:
-                        seen_keys.add(key)
+                    pair = (task_id, key)
+                    # Skip duplicates by (task_id, key) pair
+                    if key and pair not in seen:
+                        seen.add(pair)
                         processed_results.append({
+                            "task_id": task_id,
                             "key": key,
                             "value": tr.get("value", "")
                         })
@@ -36,17 +39,21 @@ def parse_llm_response(raw: Any) -> ChatGuideReply:
     
     if isinstance(raw, str):
         parsed = json.loads(raw)
-        # Handle task_id field from LLM responses and deduplicate
+        # Handle task_id field from LLM responses
+        # Deduplicate by (task_id, key) pair to allow same key for different tasks
         if "task_results" in parsed and isinstance(parsed["task_results"], list):
             processed_results = []
-            seen_keys = set()
+            seen = set()
             for tr in parsed["task_results"]:
                 if isinstance(tr, dict):
+                    task_id = tr.get("task_id", "")
                     key = tr.get("key", "")
-                    # Skip duplicates
-                    if key and key not in seen_keys:
-                        seen_keys.add(key)
+                    pair = (task_id, key)
+                    # Skip duplicates by (task_id, key) pair
+                    if key and pair not in seen:
+                        seen.add(pair)
                         processed_results.append({
+                            "task_id": task_id,
                             "key": key,
                             "value": tr.get("value", "")
                         })

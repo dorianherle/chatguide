@@ -36,6 +36,8 @@ class Context:
     
     def add_message(self, role: str, content: str):
         """Add a message to history."""
+        if role not in ("user", "assistant"):
+            raise ValueError(f"Invalid role: {role}. Must be 'user' or 'assistant'.")
         self._history.append(Message(role, content))
     
     def get_history_dict(self) -> List[Dict[str, str]]:

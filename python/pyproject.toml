@@ -6,7 +6,6 @@ build-backend = "setuptools.build_meta"
 name = "chatguide"
 version = "0.1.2"
 description = "A lightweight, modular framework for building goal-oriented conversational AI"
-readme = "README.md"
 license = {text = "MIT"}
 authors = [
     {name = "Dorian Herle", email = "dorian@example.com"}
@@ -48,7 +47,7 @@ where = ["."]
 include = ["chatguide*"]
 
 [tool.setuptools.package-data]
-chatguide = ["core/core_prompt.yaml", "static/*"]
+chatguide = ["core/core_prompt.yaml"]
 
 [tool.black]
 line-length = 100

@@ -11,10 +11,17 @@ build/
 dist/
 *.egg-info/
 
+# Logs
+*.log
+*.json.log
+*_log.json
+debug_log.json
+repro_*.json
+simulation_result_state.json
+
 # JavaScript
 node_modules/
 dist/
-*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

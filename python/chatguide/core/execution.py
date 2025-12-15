@@ -1,16 +1,25 @@
-"""ExecutionState - tracks conversation flow and progress."""
+from enum import Enum
+from typing import Dict, Any, Optional, Union
 
-from typing import List, Dict, Any, Optional
-
+class ExecStatus(str, Enum):
+    IDLE = "idle"
+    PROCESSING = "processing"
+    # Legacy 'awaiting_input' map to WAITING_USER? Or just use awaiting_input as value?
+    # Checklist said: WAITING_USER. I'll use that but support alias.
+    WAITING_USER = "awaiting_input" 
+    WAITING_TOOL = "waiting_tool"
+    COMPLETE = "complete"
+    ERROR = "error"
 
 class ExecutionState:
-    """Tracks the current position in the conversation flow."""
+    """Tracks the current position in the conversation flow.
+    
+    Note: Pending UI tools are managed by ToolExecutor (single source of truth).
+    """
     
     def __init__(self):
         self._current_task: Optional[str] = None
-        self._completed: List[str] = []
-        self._pending_tools: List[Dict[str, Any]] = []
-        self._status: str = "idle"  # idle | processing | awaiting_input | complete
+        self._status: ExecStatus = ExecStatus.IDLE
     
     @property
     def current_task(self) -> Optional[str]:
@@ -23,32 +32,36 @@ class ExecutionState:
         self._current_task = task_id
     
     @property
-    def completed(self) -> List[str]:
-        """Get list of completed task IDs."""
-        return self._completed.copy()
-    
-    @property
     def status(self) -> str:
         """Get execution status."""
-        return self._status
+        return self._status.value
     
     @status.setter
-    def status(self, value: str):
+    def status(self, value: Union[str, ExecStatus]):
         """Set execution status."""
-        self._status = value
+        # Only enforce strict transitions in debug mode
+        if self._status == ExecStatus.COMPLETE and value != ExecStatus.COMPLETE:
+            if __debug__:
+                raise ValueError("Cannot transition from COMPLETE")
+            return  # Silently ignore in production
+        
+        if isinstance(value, ExecStatus):
+            self._status = value
+            return
+            
+        try:
+            self._status = ExecStatus(value)
+        except ValueError:
+            # Handle legacy/check list divergence
+            if value == "waiting_user":
+                self._status = ExecStatus.WAITING_USER
+            else:
+                if __debug__:
+                    raise ValueError(f"Invalid status: {value}")
+                # Silently ignore invalid status in production
     
-    def mark_complete(self, task_id: str):
-        """Mark a task as completed."""
-        if task_id not in self._completed:
-            self._completed.append(task_id)
-    
-    def is_completed(self, task_id: str) -> bool:
-        """Check if a task is completed."""
-        return task_id in self._completed
-    
-    def progress(self, total_tasks: int) -> Dict[str, Any]:
+    def progress(self, completed_count: int, total_tasks: int) -> Dict[str, Any]:
         """Calculate progress metrics."""
-        completed_count = len(self._completed)
         percent = int((completed_count / total_tasks * 100)) if total_tasks > 0 else 0
         
         return {
@@ -58,25 +71,11 @@ class ExecutionState:
             "current_task": self._current_task
         }
     
-    def add_pending_tool(self, tool: Dict[str, Any]):
-        """Add a pending UI tool."""
-        self._pending_tools.append(tool)
-    
-    def get_pending_tools(self) -> List[Dict[str, Any]]:
-        """Get pending UI tools."""
-        return self._pending_tools.copy()
-    
-    def clear_pending_tools(self):
-        """Clear pending tools."""
-        self._pending_tools = []
-    
     def to_dict(self) -> Dict[str, Any]:
         """Export execution state as dict."""
         return {
             "current_task": self._current_task,
-            "completed": self._completed.copy(),
-            "pending_tools": self._pending_tools.copy(),
-            "status": self._status
+            "status": self._status.value
         }
     
     @classmethod
@@ -84,7 +83,6 @@ class ExecutionState:
         """Restore execution state from dict."""
         state = cls()
         state._current_task = data.get("current_task")
-        state._completed = data.get("completed", [])
-        state._pending_tools = data.get("pending_tools", [])
-        state._status = data.get("status", "idle")
+        # Ignore pending_tools from old checkpoints (ephemeral UI state)
+        state.status = data.get("status", "idle")
         return state

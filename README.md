@@ -1,6 +1,6 @@
 # ChatGuide
 
-![ChatGuide](python/chatguide/static/chatguide.png)
+![ChatGuide](static/chatguide.png)
 
 Build conversational AI that actually knows where it is in the conversation.
 

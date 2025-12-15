@@ -7,6 +7,18 @@ from typing import Any, Optional
 __all__ = ["run_llm"]
 
 
+from dataclasses import dataclass
+
+@dataclass
+class TokenUsage:
+    prompt: int = 0
+    completion: int = 0
+
+@dataclass
+class LLMResult:
+    content: Any  # str or dict/object
+    usage: TokenUsage
+
 def run_llm(
     prompt: str,
     *,
@@ -15,7 +27,7 @@ def run_llm(
     temperature: float = 0.6,
     max_tokens: int = 256,
     extra_config: Optional[dict[str, Any]] = None,
-):
+) -> LLMResult:
     """Route to the correct provider based on model string prefix.
     
     Expected format: "provider/model_name"
@@ -51,7 +63,7 @@ def run_llm(
 
 def _run_gemini(prompt: str, *, model: str, api_key: Optional[str],
                 temperature: float, max_tokens: int,
-                extra_config: Optional[dict[str, Any]]):
+                extra_config: Optional[dict[str, Any]]) -> LLMResult:
     from google import genai
     
     client = genai.Client(api_key=api_key)
@@ -68,16 +80,25 @@ def _run_gemini(prompt: str, *, model: str, api_key: Optional[str],
         contents=prompt,
         config=cfg,
     )
-    return getattr(resp, "parsed", None) or getattr(resp, "text", None)
+    
+    content = getattr(resp, "parsed", None) or getattr(resp, "text", None)
+    
+    # Extract usage
+    usage = TokenUsage()
+    if hasattr(resp, "usage_metadata"):
+        usage.prompt = resp.usage_metadata.prompt_token_count
+        usage.completion = resp.usage_metadata.candidates_token_count
+        
+    return LLMResult(content=content, usage=usage)
 
 
 def _run_openai(prompt: str, *, model: str, api_key: Optional[str],
                 temperature: float, max_tokens: int,
-                extra_config: Optional[dict[str, Any]]):
+                extra_config: Optional[dict[str, Any]]) -> LLMResult:
     raise NotImplementedError("OpenAI provider not yet implemented")
 
 
 def _run_anthropic(prompt: str, *, model: str, api_key: Optional[str],
                    temperature: float, max_tokens: int,
-                   extra_config: Optional[dict[str, Any]]):
+                   extra_config: Optional[dict[str, Any]]) -> LLMResult:
     raise NotImplementedError("Anthropic provider not yet implemented")

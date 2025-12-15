@@ -1,4 +1,4 @@
-﻿"""Pydantic schemas for ChatGuide."""
+"""Pydantic schemas for ChatGuide."""
 
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional, Union
@@ -18,6 +18,7 @@ class ExpectDefinition(BaseModel):
     min: Optional[float] = None  # For numbers: minimum value
     max: Optional[float] = None  # For numbers: maximum value
     choices: Optional[List[str]] = None  # For enums: valid choices
+    confirm: bool = False  # If true, requires explicit confirmation flag in state
     
     def validate_value(self, value: str) -> tuple[bool, str]:
         """Validate a value against this definition. Returns (is_valid, error_message)."""
@@ -76,6 +77,7 @@ class ToolCall(BaseModel):
 
 class TaskResult(BaseModel):
     """Task execution result from LLM."""
+    task_id: str = ""  # Which task this result belongs to (optional for backwards compat)
     key: str
     value: str
 
