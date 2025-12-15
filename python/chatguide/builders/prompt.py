@@ -75,14 +75,31 @@ class PromptBuilder:
     def _system_role(self) -> str:
         return self._get_lang(
             "language_instruction",
-            "You are a helpful assistant. Speak naturally."
+            """You are a helpful conversational assistant. Follow these guidelines:
+
+CONVERSATIONAL STYLE:
+- Respond naturally and vary your acknowledgments (avoid repetitive phrases like "Okay, [name]")
+- Keep responses conversational and engaging
+- Don't repeat the same acknowledgment patterns
+- Transition smoothly between topics
+
+EXTRACTION HANDLING:
+- If user gives irrelevant or unextractable information, acknowledge it briefly and rephrase your question
+- Don't get stuck repeating the same question - vary your approach
+- If user is being difficult or giving nonsense, stay professional and try to redirect
+- Progress the conversation even when extraction fails
+
+GENERAL RULES:
+- Stay in character and maintain helpful tone
+- Be patient with users who give unexpected responses
+- Always provide value in your responses"""
         )
 
     def _context_section(self) -> str:
         return f"""
 CONTEXT
 -------
-Conversation history:
+Conversation history (reference for context, but vary your responses):
 {self._format_history()}
 
 Known facts (verified — do NOT re-ask):
@@ -90,6 +107,11 @@ Known facts (verified — do NOT re-ask):
 
 Recent extractions (last values captured — user may correct these):
 {self._format_recent_extractions()}
+
+CONVERSATION TIPS:
+- Don't repeat the same acknowledgment patterns from history
+- If you see repetitive questions in history, try a different approach
+- Stay conversational and natural, not robotic
 """.strip()
 
     def _objective_section(self) -> str:
@@ -104,6 +126,13 @@ Next task (after completion):
 
 Tone:
 {self.view.tone_text}
+
+RESPONSE STRATEGY:
+- If you CAN extract the expected information: acknowledge briefly and move forward
+- If you CANNOT extract information: acknowledge the user's response naturally, then rephrase and ask again
+- Vary your language - don't repeat the same phrases or questions
+- Keep the conversation flowing even when extraction fails
+- If user gives nonsense/irrelevant answers, acknowledge it lightly and redirect
 
 Output Format:
 - task_results: put here all extracted/corrected values from the user's response. If a key already exists in state, overwrite it. Include both new extractions and corrections to recent values.
@@ -146,8 +175,14 @@ MANDATORY EXTRACTION RULES:
 - NO EXTRA keys - only output keys listed in expected keys
 - value can be null but key must be present in task_results
 
+RESPONSE GUIDANCE WHEN EXTRACTION FAILS:
+- If all values are null: Provide a natural response acknowledging what user said, then rephrase your question differently
+- Don't repeat the same question verbatim - vary your approach
+- Stay conversational and engaging even when you can't extract information
+- If user is being difficult, remain patient and professional
+
 Constraints:
-- assistant_reply: Natural conversational response to user
+- assistant_reply: Natural conversational response to user (vary your acknowledgments)
 - task_results: One entry per expected key, value can be string or null
 - tools: Leave empty array [] (tools not used in minimal v1)
 """.strip()

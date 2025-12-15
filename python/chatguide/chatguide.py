@@ -109,7 +109,7 @@ class ChatGuide:
     
     # =========== CHAT ===========
     
-    def chat(self, model: str = "gemini/gemini-2.0-flash-exp", api_key: str = None, max_retries: int = 3) -> ChatGuideReply:
+    def chat(self, model: str = "gemini/gemini-2.0-flash-exp", api_key: str = None, max_retries: int = 2) -> ChatGuideReply:
         """Execute one chat turn. Re-asks if task not complete due to null values."""
         retry_count = 0
         while retry_count < max_retries:
@@ -145,9 +145,16 @@ class ChatGuide:
                         print(f"[DEBUG] Task '{current_task_id}' incomplete due to null values for keys: {null_keys}. Re-asking... ({retry_count}/{max_retries})")
                     continue
                 else:
-                    # Max retries reached, return anyway
+                    # Max retries reached - force completion with current data (may include nulls)
                     if self.debug:
-                        print(f"[DEBUG] Max retries ({max_retries}) reached for task '{current_task_id}', returning incomplete")
+                        print(f"[DEBUG] Max retries ({max_retries}) reached for task '{current_task_id}', force-completing with available data")
+                    self.state["completed"].add(current_task_id)
+
+                    # Advance if block complete
+                    if self._block_complete():
+                        if self.debug:
+                            print(f"[DEBUG] Block {self.state['block']} complete, advancing to block {self.state['block'] + 1}")
+                        self.state["block"] += 1
 
             # Silent tasks loop, visible tasks return
             if not is_silent:
