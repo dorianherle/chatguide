@@ -78,7 +78,15 @@ async def chat(request: ChatRequest):
     try:
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
-            raise HTTPException(status_code=500, detail="GEMINI_API_KEY not configured")
+            raise HTTPException(
+                status_code=500,
+                detail="GEMINI_API_KEY environment variable is not set. Please configure your Gemini API key."
+            )
+        if not api_key.startswith("AIza"):
+            raise HTTPException(
+                status_code=500,
+                detail="GEMINI_API_KEY appears to be invalid. Gemini API keys should start with 'AIza'."
+            )
 
         session_id = request.session_id or str(uuid.uuid4())
 
@@ -87,11 +95,17 @@ async def chat(request: ChatRequest):
 
         if request.action == "reset" or cg is None:
             # Initialize new ChatGuide
-            cg = ChatGuide(
-                api_key=api_key,
-                config=CONFIG_PATH,
-                debug=True
-            )
+            try:
+                cg = ChatGuide(
+                    api_key=api_key,
+                    config=CONFIG_PATH,
+                    debug=True
+                )
+            except Exception as config_error:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Configuration error: {str(config_error)}"
+                )
 
             # Get initial response
             reply = cg.chat()
@@ -153,6 +167,138 @@ async def chat(request: ChatRequest):
 async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "service": "ChatGuide API"}
+
+
+@app.post("/api/reload-config")
+async def reload_config():
+    """Reload configuration for all active sessions"""
+    try:
+        reloaded_count = 0
+        failed_count = 0
+
+        for session_id, cg in chat_sessions.items():
+            if cg.reload_config():
+                reloaded_count += 1
+            else:
+                failed_count += 1
+
+        return {
+            "status": "config_reloaded",
+            "reloaded_sessions": reloaded_count,
+            "failed_sessions": failed_count,
+            "total_sessions": len(chat_sessions)
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Config reload error: {str(e)}")
+
+
+@app.get("/api/progress/{session_id}")
+async def get_progress(session_id: str):
+    """Get detailed progress information for a session"""
+    try:
+        cg = chat_sessions.get(session_id)
+        if not cg:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        progress = cg.get_progress()
+
+        # Enhanced progress info
+        current_block = cg.state["block"]
+        total_blocks = len(cg.config["blocks"])
+
+        block_progress = []
+        for i in range(total_blocks):
+            block_tasks = cg.config["blocks"][i] if i < len(cg.config["blocks"]) else []
+            completed_in_block = sum(1 for tid in block_tasks if tid in cg.state["completed"])
+            block_progress.append({
+                "block_index": i,
+                "total_tasks": len(block_tasks),
+                "completed_tasks": completed_in_block,
+                "is_current": i == current_block,
+                "is_completed": i < current_block
+            })
+
+        return {
+            "session_id": session_id,
+            "finished": cg.is_finished(),
+            "overall_progress": progress,
+            "block_progress": block_progress,
+            "current_block_details": {
+                "index": current_block,
+                "tasks": [
+                    {
+                        "id": tid,
+                        "description": cg.config["tasks"].get(tid, {}).get("description", ""),
+                        "completed": tid in cg.state["completed"]
+                    } for tid in (cg.config["blocks"][current_block] if current_block < total_blocks else [])
+                ]
+            } if current_block < total_blocks else None
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Progress error: {str(e)}")
+
+
+@app.get("/api/debug/{session_id}")
+async def debug_session(session_id: str):
+    """Debug endpoint to inspect session state"""
+    try:
+        cg = chat_sessions.get(session_id)
+        if not cg:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        # Get detailed state information
+        current_block = cg.state["block"]
+        total_blocks = len(cg.config["blocks"])
+
+        # Get current block tasks
+        current_block_tasks = []
+        if current_block < total_blocks:
+            for task_id in cg.config["blocks"][current_block]:
+                task_def = cg.config["tasks"].get(task_id, {})
+                current_block_tasks.append({
+                    "id": task_id,
+                    "description": task_def.get("description", ""),
+                    "expects": [exp.key if hasattr(exp, 'key') else exp for exp in task_def.get("expects", [])],
+                    "completed": task_id in cg.state["completed"],
+                    "silent": task_def.get("silent", False)
+                })
+
+        # Get pending tasks across all blocks
+        pending_tasks = []
+        for block_idx, block in enumerate(cg.config["blocks"]):
+            for task_id in block:
+                if task_id not in cg.state["completed"]:
+                    task_def = cg.config["tasks"].get(task_id, {})
+                    pending_tasks.append({
+                        "id": task_id,
+                        "block": block_idx,
+                        "description": task_def.get("description", ""),
+                        "expects": [exp.key if hasattr(exp, 'key') else exp for exp in task_def.get("expects", [])]
+                    })
+
+        return {
+            "session_id": session_id,
+            "finished": cg.is_finished(),
+            "current_block": current_block,
+            "total_blocks": total_blocks,
+            "progress": cg.get_progress(),
+            "current_block_tasks": current_block_tasks,
+            "pending_tasks": pending_tasks,
+            "completed_tasks": list(cg.state["completed"]),
+            "extracted_data": cg.state["data"],
+            "recent_keys": cg.state["recent_keys"],
+            "conversation_length": len(cg.state["messages"]),
+            "config_summary": {
+                "total_tasks": len(cg.config["tasks"]),
+                "tone": cg.config["tone"],
+                "language": cg.config["language"]
+            }
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Debug error: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

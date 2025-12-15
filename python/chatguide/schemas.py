@@ -79,7 +79,7 @@ class TaskResult(BaseModel):
     """Task execution result from LLM."""
     task_id: str = ""  # Which task this result belongs to (optional for backwards compat)
     key: str
-    value: str
+    value: Optional[str] = None  # Allow null values for mandatory extraction entries
 
 
 

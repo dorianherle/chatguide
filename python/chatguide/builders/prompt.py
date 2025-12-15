@@ -113,6 +113,14 @@ General:
 """.strip()
 
     def _response_contract(self) -> str:
+        # Get expected keys for current task
+        current_task = self.view.current_task
+        expected_keys = []
+        if current_task and current_task.expects:
+            expected_keys = [exp.key for exp in current_task.expects]
+
+        expected_keys_str = ", ".join(f'"{k}"' for k in expected_keys) if expected_keys else "none"
+
         return f"""
 RESPONSE FORMAT
 ---------------
@@ -124,22 +132,24 @@ Respond ONLY with valid JSON:
     {{
       "task_id": "task_name",
       "key": "state_variable_name",
-      "value": "extracted_value"
+      "value": "extracted_value_or_null"
     }}
   ],
-  "tools": [
-    {{
-      "tool": "tool_id",
-      "options": ["option1"]
-    }}
-  ]
+  "tools": []
 }}
 
+MANDATORY EXTRACTION RULES:
+- Expected keys: {expected_keys_str}
+- OUTPUT EXACTLY ONE task_result FOR EACH expected key (no more, no less)
+- Use value: null if you cannot extract a meaningful value
+- NO MISSING task_results entries - every expected key must be present
+- NO EXTRA keys - only output keys listed in expected keys
+- value can be null but key must be present in task_results
+
 Constraints:
-- One task_result per key (no duplicates)
-- If a key already exists in state, overwrite it with new values
-- Include both new extractions and corrections in task_results
-- Include tools ONLY if explicitly defined for the current task
+- assistant_reply: Natural conversational response to user
+- task_results: One entry per expected key, value can be string or null
+- tools: Leave empty array [] (tools not used in minimal v1)
 """.strip()
 
     # ==================================================
