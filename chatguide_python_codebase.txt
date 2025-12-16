@@ -1,17 +1,17 @@
-ChatGuide PYTHON Codebase Export - 2025-12-15 23:55:17
+ChatGuide PYTHON Codebase Export - 2025-12-16 00:04:41
 ================================================================================
 
 SUMMARY
 ------------------------------
 Total Python files: 26
-Total size: 98,506 bytes (96.2 KB)
-Total lines: 2,680
+Total size: 100,689 bytes (98.3 KB)
+Total lines: 2,732
 
 CATEGORY BREAKDOWN
 ------------------------------
 OTHER: 1 files, 35 lines, 0.8 KB
-CORE_PACKAGE: 6 files, 957 lines, 35.0 KB
-BUILDERS: 2 files, 275 lines, 9.2 KB
+CORE_PACKAGE: 6 files, 994 lines, 36.5 KB
+BUILDERS: 2 files, 290 lines, 9.8 KB
 CORE_ENGINE: 6 files, 378 lines, 12.4 KB
 IO_LAYER: 3 files, 251 lines, 8.7 KB
 TOOLS: 2 files, 3 lines, 0.1 KB
@@ -31,7 +31,7 @@ FILE DETAILS
   python/chatguide\adjustments.py
     Size: 6,941 bytes | Lines: 214 | Modified: 2025-12-15 20:20:13
   python/chatguide\chatguide.py
-    Size: 15,779 bytes | Lines: 379 | Modified: 2025-12-15 23:36:56
+    Size: 17,372 bytes | Lines: 416 | Modified: 2025-12-15 23:58:58
   python/chatguide\plan.py
     Size: 2,843 bytes | Lines: 87 | Modified: 2025-12-13 17:00:39
   python/chatguide\schemas.py
@@ -46,7 +46,7 @@ FILE DETAILS
   python/chatguide\builders\__init__.py
     Size: 15 bytes | Lines: 1 | Modified: 2025-12-13 16:52:15
   python/chatguide\builders\prompt.py
-    Size: 9,421 bytes | Lines: 274 | Modified: 2025-12-15 23:36:56
+    Size: 10,011 bytes | Lines: 289 | Modified: 2025-12-15 23:58:58
 
 [CORE_ENGINE]
 -------------
@@ -112,7 +112,7 @@ FILE: python/chatguide\__init__.py
 CATEGORY: OTHER
 STATS: 35 lines, 846 bytes
 MODIFIED: 2025-12-13 17:00:39
-FULL PATH: C:\Users\photo\Desktop\chatguide\python\chatguide\__init__.py
+FULL PATH: c:\Users\photo\Desktop\chatguide\python\chatguide\__init__.py
 ------------------------------------------------------------
 
 ﻿"""ChatGuide - State-driven conversational agent framework."""
@@ -164,7 +164,7 @@ FILE: python/chatguide\adjustments.py
 CATEGORY: CORE_PACKAGE
 STATS: 214 lines, 6,941 bytes
 MODIFIED: 2025-12-15 20:20:13
-FULL PATH: C:\Users\photo\Desktop\chatguide\python\chatguide\adjustments.py
+FULL PATH: c:\Users\photo\Desktop\chatguide\python\chatguide\adjustments.py
 ------------------------------------------------------------
 
 """Adjustments - reactive rules that monitor state and modify plan/tone/state."""
@@ -388,9 +388,9 @@ class Adjustments:
 ------------------------------------------------------------
 FILE: python/chatguide\chatguide.py
 CATEGORY: CORE_PACKAGE
-STATS: 379 lines, 15,779 bytes
-MODIFIED: 2025-12-15 23:36:56
-FULL PATH: C:\Users\photo\Desktop\chatguide\python\chatguide\chatguide.py
+STATS: 416 lines, 17,372 bytes
+MODIFIED: 2025-12-15 23:58:58
+FULL PATH: c:\Users\photo\Desktop\chatguide\python\chatguide\chatguide.py
 ------------------------------------------------------------
 
 """ChatGuide - lean conversational agent framework."""
@@ -420,6 +420,7 @@ class ChatGuide:
             "block": 0,           # Current block index
             "completed": set(),   # Completed task IDs
             "recent_keys": [],    # Recent keys in order of extraction/correction
+            "last_error": None,   # Store validation errors here
         }
 
         # === STATIC CONFIG (loaded once) ===
@@ -638,6 +639,9 @@ class ChatGuide:
             next_block_task=next_block_task,
             recent_extractions=recent_extractions,
         )
+        # Inject the error into the view manually or add a field
+        view.last_error = self.state.get("last_error")
+
         return PromptBuilder(view).build()
     
     def _make_task(self, task_id: str) -> Optional[Task]:
@@ -667,6 +671,8 @@ class ChatGuide:
     
     def _process_reply(self, reply: ChatGuideReply):
         """Process reply: update state, complete tasks, advance."""
+        self.state["last_error"] = None  # Reset error at start of processing
+
         current_task_id = self._current_task_id()
         if not current_task_id:
             return
@@ -700,11 +706,42 @@ class ChatGuide:
                 if self.debug:
                     print(f"[DEBUG] Added missing result for key '{expected_key}' with null value")
 
-        # 3. Update data and track recent keys
+        # 3. VALIDATION & UPDATE (REPLACE YOUR STEP 3 WITH THIS)
         for tr in complete_results:
-            self.state["data"][tr.key] = tr.value
-            if tr.key not in self.state["recent_keys"]:
-                self.state["recent_keys"].append(tr.key)
+            # Skip validation if value is already None
+            if tr.value is None:
+                continue
+
+            # Find the expectation definition for this key
+            expects = current_task_def.get("expects", [])
+
+            # Perform validation
+            is_valid = True
+            error_msg = ""
+
+            # Find the specific ExpectDefinition for this key
+            matching_exp = next((e for e in expects if e.key == tr.key), None)
+
+            if matching_exp:
+                # Use the validate_value method from ExpectDefinition
+                is_valid, error_msg = matching_exp.validate_value(tr.value)
+
+            if is_valid:
+                self.state["data"][tr.key] = tr.value
+                if tr.key not in self.state["recent_keys"]:
+                    self.state["recent_keys"].append(tr.key)
+            else:
+                # VALIDATION FAILED
+                if self.debug:
+                    print(f"[VALIDATION FAIL] Key: {tr.key}, Value: {tr.value}, Error: {error_msg}")
+
+                # 1. Don't save the data (keep it None/old)
+                # 2. Set the error so the Prompt knows to complain
+                self.state["last_error"] = f"User provided '{tr.value}' for '{tr.key}', but that is invalid: {error_msg}. Ask them to correct it."
+
+                # If one fails, we stop processing results to ensure we ask about this one
+                # (Optional: you could collect all errors)
+                break
 
         # 4. Check if current task is complete (all non-null)
         if self._task_is_complete(current_task_id):
@@ -781,7 +818,7 @@ FILE: python/chatguide\plan.py
 CATEGORY: CORE_PACKAGE
 STATS: 87 lines, 2,843 bytes
 MODIFIED: 2025-12-13 17:00:39
-FULL PATH: C:\Users\photo\Desktop\chatguide\python\chatguide\plan.py
+FULL PATH: c:\Users\photo\Desktop\chatguide\python\chatguide\plan.py
 ------------------------------------------------------------
 
 """Plan - ordered sequence of task blocks with manipulation methods."""
@@ -880,7 +917,7 @@ FILE: python/chatguide\schemas.py
 CATEGORY: CORE_PACKAGE
 STATS: 95 lines, 3,702 bytes
 MODIFIED: 2025-12-15 23:15:15
-FULL PATH: C:\Users\photo\Desktop\chatguide\python\chatguide\schemas.py
+FULL PATH: c:\Users\photo\Desktop\chatguide\python\chatguide\schemas.py
 ------------------------------------------------------------
 
 """Pydantic schemas for ChatGuide."""
@@ -987,7 +1024,7 @@ FILE: python/chatguide\state.py
 CATEGORY: CORE_PACKAGE
 STATS: 122 lines, 4,616 bytes
 MODIFIED: 2025-12-15 20:20:13
-FULL PATH: C:\Users\photo\Desktop\chatguide\python\chatguide\state.py
+FULL PATH: c:\Users\photo\Desktop\chatguide\python\chatguide\state.py
 ------------------------------------------------------------
 
 """State - flat dictionary with template resolution and audit tracking."""
@@ -1121,7 +1158,7 @@ FILE: python/chatguide\tool_executor.py
 CATEGORY: CORE_PACKAGE
 STATS: 60 lines, 1,952 bytes
 MODIFIED: 2025-12-14 13:04:37
-FULL PATH: C:\Users\photo\Desktop\chatguide\python\chatguide\tool_executor.py
+FULL PATH: c:\Users\photo\Desktop\chatguide\python\chatguide\tool_executor.py
 ------------------------------------------------------------
 
 """Tools - simple tool executor."""
@@ -1198,7 +1235,7 @@ FILE: python/chatguide\builders\__init__.py
 CATEGORY: BUILDERS
 STATS: 1 lines, 15 bytes
 MODIFIED: 2025-12-13 16:52:15
-FULL PATH: C:\Users\photo\Desktop\chatguide\python\chatguide\builders\__init__.py
+FULL PATH: c:\Users\photo\Desktop\chatguide\python\chatguide\builders\__init__.py
 ------------------------------------------------------------
 
 ﻿# Builders
@@ -1209,9 +1246,9 @@ FULL PATH: C:\Users\photo\Desktop\chatguide\python\chatguide\builders\__init__.p
 ------------------------------------------------------------
 FILE: python/chatguide\builders\prompt.py
 CATEGORY: BUILDERS
-STATS: 274 lines, 9,421 bytes
-MODIFIED: 2025-12-15 23:36:56
-FULL PATH: C:\Users\photo\Desktop\chatguide\python\chatguide\builders\prompt.py
+STATS: 289 lines, 10,011 bytes
+MODIFIED: 2025-12-15 23:58:58
+FULL PATH: c:\Users\photo\Desktop\chatguide\python\chatguide\builders\prompt.py
 ------------------------------------------------------------
 
 from dataclasses import dataclass
@@ -1238,6 +1275,7 @@ class PromptView:
     language: str = "en"
     next_block_task: Optional[Task] = None  # First task of next block
     recent_extractions: List[Dict[str, Any]] = None  # Last N extractions for corrections
+    last_error: Optional[str] = None  # Validation error from previous response
 
 
 # ============================================================
@@ -1291,32 +1329,35 @@ class PromptBuilder:
     def _system_role(self) -> str:
         return self._get_lang(
             "language_instruction",
-            """You are a helpful conversational assistant. Follow these guidelines:
+            """You are Sol, a warm and intelligent AI companion.
 
-CONVERSATIONAL STYLE:
-- Respond naturally and vary your acknowledgments (avoid repetitive phrases like "Okay, [name]")
-- Keep responses conversational and engaging
-- Don't repeat the same acknowledgment patterns
-- Transition smoothly between topics
+CRITICAL STYLE RULES:
+1. VARIETY IS MANDATORY:
+   - Do NOT start sentences with "Ah,", "Oh,", "That's great!", "Nice to meet you".
+   - Do NOT repeat the user's name in every single message. Use it rarely.
+   - Do NOT mirror the user's sentence structure back to them.
 
-EXTRACTION HANDLING:
-- If user gives irrelevant or unextractable information, acknowledge it briefly and rephrase your question
-- Don't get stuck repeating the same question - vary your approach
-- If user is being difficult or giving nonsense, stay professional and try to redirect
-- Progress the conversation even when extraction fails
+2. CONVERSATION FLOW:
+   - React specifically to the content. If they say "Switzerland", mention a specific detail about Switzerland (e.g., Cantons, Alps) rather than just "Beautiful country".
+   - Keep it concise.
+   - If you need to ask a question, blend it into the conversation naturally, don't just interrogate.
 
-GENERAL RULES:
-- Stay in character and maintain helpful tone
-- Be patient with users who give unexpected responses
-- Always provide value in your responses"""
+3. REALISM:
+   - If the user gives a suspicious answer (like living in a place for 200 years), react with surprise, skepticism, or humor. Do not blindly accept it.
+"""
         )
 
     def _context_section(self) -> str:
         return f"""
 CONTEXT
 -------
-Conversation history (reference for context, but vary your responses):
+Conversation history:
 {self._format_history()}
+
+STYLE CHECK:
+Look at the last message in history.
+- If you started the last message with "Ah," or "Great,", you are FORBIDDEN from doing it again now.
+- If you used the user's name in the last message, do NOT use it in this one.
 
 Known facts (verified — do NOT re-ask):
 {self._format_state()}
@@ -1331,9 +1372,20 @@ CONVERSATION TIPS:
 """.strip()
 
     def _objective_section(self) -> str:
+        error_instruction = ""
+        if self.view.last_error:
+            error_instruction = f"""
+CRITICAL INSTRUCTION - VALIDATION FAILED:
+{self.view.last_error}
+You MUST inform the user why their previous answer was invalid and ask for a valid value.
+Do NOT acknowledge the invalid value as if it were true.
+"""
+
         return f"""
 OBJECTIVE
 ---------
+{error_instruction}
+
 Current task:
 {self._format_current_task()}
 
@@ -1502,7 +1554,7 @@ FILE: python/chatguide\core\__init__.py
 CATEGORY: CORE_ENGINE
 STATS: 9 lines, 249 bytes
 MODIFIED: 2025-12-14 09:55:45
-FULL PATH: C:\Users\photo\Desktop\chatguide\python\chatguide\core\__init__.py
+FULL PATH: c:\Users\photo\Desktop\chatguide\python\chatguide\core\__init__.py
 ------------------------------------------------------------
 
 ﻿"""Core components."""
@@ -1523,7 +1575,7 @@ FILE: python/chatguide\core\audit.py
 CATEGORY: CORE_ENGINE
 STATS: 84 lines, 2,495 bytes
 MODIFIED: 2025-12-13 17:00:39
-FULL PATH: C:\Users\photo\Desktop\chatguide\python\chatguide\core\audit.py
+FULL PATH: c:\Users\photo\Desktop\chatguide\python\chatguide\core\audit.py
 ------------------------------------------------------------
 
 """AuditLog - append-only change tracking."""
@@ -1619,7 +1671,7 @@ FILE: python/chatguide\core\block.py
 CATEGORY: CORE_ENGINE
 STATS: 37 lines, 1,246 bytes
 MODIFIED: 2025-12-13 17:00:39
-FULL PATH: C:\Users\photo\Desktop\chatguide\python\chatguide\core\block.py
+FULL PATH: c:\Users\photo\Desktop\chatguide\python\chatguide\core\block.py
 ------------------------------------------------------------
 
 """Block object representing a group of tasks."""
@@ -1668,7 +1720,7 @@ FILE: python/chatguide\core\context.py
 CATEGORY: CORE_ENGINE
 STATS: 69 lines, 2,445 bytes
 MODIFIED: 2025-12-15 20:20:13
-FULL PATH: C:\Users\photo\Desktop\chatguide\python\chatguide\core\context.py
+FULL PATH: c:\Users\photo\Desktop\chatguide\python\chatguide\core\context.py
 ------------------------------------------------------------
 
 """Context - manages conversation history and session metadata."""
@@ -1749,7 +1801,7 @@ FILE: python/chatguide\core\execution.py
 CATEGORY: CORE_ENGINE
 STATS: 88 lines, 3,023 bytes
 MODIFIED: 2025-12-15 20:20:13
-FULL PATH: C:\Users\photo\Desktop\chatguide\python\chatguide\core\execution.py
+FULL PATH: c:\Users\photo\Desktop\chatguide\python\chatguide\core\execution.py
 ------------------------------------------------------------
 
 from enum import Enum
@@ -1849,7 +1901,7 @@ FILE: python/chatguide\core\task.py
 CATEGORY: CORE_ENGINE
 STATS: 91 lines, 3,207 bytes
 MODIFIED: 2025-12-15 20:20:13
-FULL PATH: C:\Users\photo\Desktop\chatguide\python\chatguide\core\task.py
+FULL PATH: c:\Users\photo\Desktop\chatguide\python\chatguide\core\task.py
 ------------------------------------------------------------
 
 """Task object representing a unit of work."""
@@ -1957,7 +2009,7 @@ FILE: python/chatguide\io\__init__.py
 CATEGORY: IO_LAYER
 STATS: 1 lines, 9 bytes
 MODIFIED: 2025-12-13 16:52:15
-FULL PATH: C:\Users\photo\Desktop\chatguide\python\chatguide\io\__init__.py
+FULL PATH: c:\Users\photo\Desktop\chatguide\python\chatguide\io\__init__.py
 ------------------------------------------------------------
 
 ﻿# IO
@@ -1970,7 +2022,7 @@ FILE: python/chatguide\io\llm.py
 CATEGORY: IO_LAYER
 STATS: 104 lines, 3,586 bytes
 MODIFIED: 2025-12-14 10:31:50
-FULL PATH: C:\Users\photo\Desktop\chatguide\python\chatguide\io\llm.py
+FULL PATH: c:\Users\photo\Desktop\chatguide\python\chatguide\io\llm.py
 ------------------------------------------------------------
 
 from __future__ import annotations
@@ -2086,7 +2138,7 @@ FILE: python/chatguide\io\storage.py
 CATEGORY: IO_LAYER
 STATS: 146 lines, 5,288 bytes
 MODIFIED: 2025-12-13 16:52:15
-FULL PATH: C:\Users\photo\Desktop\chatguide\python\chatguide\io\storage.py
+FULL PATH: c:\Users\photo\Desktop\chatguide\python\chatguide\io\storage.py
 ------------------------------------------------------------
 
 """Storage adapters for persisting conversation state."""
@@ -2249,7 +2301,7 @@ FILE: python/chatguide\tools\__init__.py
 CATEGORY: TOOLS
 STATS: 1 lines, 73 bytes
 MODIFIED: 2025-12-13 16:52:15
-FULL PATH: C:\Users\photo\Desktop\chatguide\python\chatguide\tools\__init__.py
+FULL PATH: c:\Users\photo\Desktop\chatguide\python\chatguide\tools\__init__.py
 ------------------------------------------------------------
 
 """HTML tool definitions - tools are registered in main __init__.py."""
@@ -2262,7 +2314,7 @@ FILE: python/chatguide\tools\html\__init__.py
 CATEGORY: TOOLS
 STATS: 2 lines, 38 bytes
 MODIFIED: 2025-12-13 16:52:15
-FULL PATH: C:\Users\photo\Desktop\chatguide\python\chatguide\tools\html\__init__.py
+FULL PATH: c:\Users\photo\Desktop\chatguide\python\chatguide\tools\html\__init__.py
 ------------------------------------------------------------
 
 """HTML interactive components."""
@@ -2281,7 +2333,7 @@ FILE: python/chatguide\utils\__init__.py
 CATEGORY: UTILITIES
 STATS: 1 lines, 12 bytes
 MODIFIED: 2025-12-13 16:52:15
-FULL PATH: C:\Users\photo\Desktop\chatguide\python\chatguide\utils\__init__.py
+FULL PATH: c:\Users\photo\Desktop\chatguide\python\chatguide\utils\__init__.py
 ------------------------------------------------------------
 
 ﻿# Utils
@@ -2294,7 +2346,7 @@ FILE: python/chatguide\utils\config_loader.py
 CATEGORY: UTILITIES
 STATS: 325 lines, 13,711 bytes
 MODIFIED: 2025-12-15 23:15:15
-FULL PATH: C:\Users\photo\Desktop\chatguide\python\chatguide\utils\config_loader.py
+FULL PATH: c:\Users\photo\Desktop\chatguide\python\chatguide\utils\config_loader.py
 ------------------------------------------------------------
 
 """Config loader - parses YAML configuration files."""
@@ -2631,7 +2683,7 @@ FILE: python/chatguide\utils\debug_formatter.py
 CATEGORY: UTILITIES
 STATS: 181 lines, 6,983 bytes
 MODIFIED: 2025-12-13 16:52:15
-FULL PATH: C:\Users\photo\Desktop\chatguide\python\chatguide\utils\debug_formatter.py
+FULL PATH: c:\Users\photo\Desktop\chatguide\python\chatguide\utils\debug_formatter.py
 ------------------------------------------------------------
 
 """Debug output formatter - beautiful console display."""
@@ -2824,7 +2876,7 @@ FILE: python/chatguide\utils\logger.py
 CATEGORY: UTILITIES
 STATS: 127 lines, 4,739 bytes
 MODIFIED: 2025-12-13 16:52:15
-FULL PATH: C:\Users\photo\Desktop\chatguide\python\chatguide\utils\logger.py
+FULL PATH: c:\Users\photo\Desktop\chatguide\python\chatguide\utils\logger.py
 ------------------------------------------------------------
 
 """Structured logging for ChatGuide."""
@@ -2963,7 +3015,7 @@ FILE: python/chatguide\utils\response_parser.py
 CATEGORY: UTILITIES
 STATS: 65 lines, 2,630 bytes
 MODIFIED: 2025-12-15 20:20:13
-FULL PATH: C:\Users\photo\Desktop\chatguide\python\chatguide\utils\response_parser.py
+FULL PATH: c:\Users\photo\Desktop\chatguide\python\chatguide\utils\response_parser.py
 ------------------------------------------------------------
 
 """Response parser - parses LLM responses."""
@@ -3045,7 +3097,7 @@ FILE: python/scripts\validate_config.py
 CATEGORY: SCRIPTS
 STATS: 82 lines, 2,657 bytes
 MODIFIED: 2025-12-15 22:41:27
-FULL PATH: C:\Users\photo\Desktop\chatguide\python\scripts\validate_config.py
+FULL PATH: c:\Users\photo\Desktop\chatguide\python\scripts\validate_config.py
 ------------------------------------------------------------
 
 #!/usr/bin/env python3
