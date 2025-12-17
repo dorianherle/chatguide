@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChatGuide - Nexus Terminal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="/static/css/styles.css" rel="stylesheet">
+</head>
+<body class="h-full bg-slate-900 text-slate-100 font-mono">
+    <div class="h-full flex">
+        <!-- Chat Interface (Left Panel) -->
+        <div class="flex-1 flex flex-col relative">
+            <!-- Chat Messages Area -->
+            <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4">
+                <!-- Empty State -->
+                <div id="empty-state" class="flex items-center justify-center h-full">
+                    <div class="text-center">
+                        <div class="w-16 h-16 bg-slate-800 rounded-full mx-auto mb-4 flex items-center justify-center">
+                            <div class="w-8 h-8 bg-slate-600 rounded-full animate-pulse"></div>
+                        </div>
+                        <h2 class="text-xl font-semibold text-slate-300 mb-2">System Ready</h2>
+                        <p class="text-slate-500">Nexus online. Awaiting input.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Audit Overlay -->
+            <div id="audit-overlay" class="absolute inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center hidden z-10">
+                <div class="text-center">
+                    <div class="w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                    <p class="text-amber-400 font-semibold">System Audit: The Director is analyzing...</p>
+                </div>
+            </div>
+
+            <!-- Input Bar -->
+            <div class="border-t border-slate-700 p-4">
+                <div class="flex space-x-2">
+                    <input
+                        id="message-input"
+                        type="text"
+                        placeholder="Enter your message..."
+                        class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        disabled
+                    >
+                    <button
+                        id="send-button"
+                        class="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white p-3 rounded-lg transition-colors"
+                        disabled
+                    >
+                        <i data-lucide="send" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Director Panel (Right Sidebar) -->
+        <div class="w-96 bg-slate-800 border-l border-slate-700 hidden lg:flex flex-col">
+            <!-- Header -->
+            <div class="p-4 border-b border-slate-700">
+                <div class="flex items-center justify-between">
+                    <h1 class="text-lg font-semibold text-slate-100">DIRECTOR CONTROL</h1>
+                    <div id="status-pill" class="px-3 py-1 rounded-full text-xs font-medium bg-green-600 text-white">
+                        MONITORING
+                    </div>
+                </div>
+            </div>
+
+            <!-- Director Modules -->
+            <div class="flex-1 overflow-y-auto p-4 space-y-4">
+                <!-- Epoch Progress -->
+                <div class="bg-slate-900 rounded-lg p-4">
+                    <h3 class="text-sm font-medium text-slate-300 mb-3">EPOCH PROGRESS</h3>
+                    <div class="mb-2">
+                        <div class="flex justify-between text-xs text-slate-400 mb-1">
+                            <span>Turn <span id="current-turn">0</span> of 3</span>
+                        </div>
+                        <div class="w-full bg-slate-700 rounded-full h-2">
+                            <div id="epoch-progress" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Active Blueprint Block -->
+                <div class="bg-slate-900 rounded-lg p-4">
+                    <h3 class="text-sm font-medium text-slate-300 mb-3">ACTIVE BLUEPRINT BLOCK</h3>
+                    <div class="space-y-2">
+                        <div class="text-sm text-slate-400">Theme: <span id="current-theme" class="text-slate-300">Identity & Origin</span></div>
+                        <div class="text-sm text-slate-400">Progress: <span id="block-progress" class="text-slate-300">0/4</span></div>
+                        <div class="text-xs text-slate-500">Target Fields:</div>
+                        <div id="target-fields" class="flex flex-wrap gap-1">
+                            <!-- Fields will be populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Current Standing Order -->
+                <div class="bg-slate-900 rounded-lg p-4 border-l-4 border-purple-500">
+                    <h3 class="text-sm font-medium text-slate-300 mb-3">CURRENT STANDING ORDER</h3>
+                    <div id="standing-order" class="text-sm text-slate-400 italic">
+                        Loading directive...
+                    </div>
+                </div>
+
+                <!-- Extracted Knowledge -->
+                <div class="bg-slate-900 rounded-lg p-4">
+                    <h3 class="text-sm font-medium text-slate-300 mb-3">EXTRACTED KNOWLEDGE</h3>
+                    <pre id="extracted-data" class="text-xs text-green-400 bg-slate-950 p-3 rounded overflow-x-auto font-mono">
+{}
+                    </pre>
+                </div>
+
+                <!-- Director's Log -->
+                <div class="bg-slate-900 rounded-lg p-4">
+                    <h3 class="text-sm font-medium text-slate-300 mb-3">DIRECTOR'S LOG</h3>
+                    <div id="director-log" class="space-y-2 text-xs max-h-40 overflow-y-auto">
+                        <!-- Log entries will be populated dynamically -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Turn Inspector Modal -->
+    <div id="turn-inspector-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden z-50 flex items-center justify-center">
+        <div class="bg-slate-800 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-semibold text-slate-100">Turn Inspector</h2>
+                <button id="close-inspector" class="text-slate-400 hover:text-slate-200">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <h3 class="text-sm font-medium text-slate-300 mb-2">Static Persona</h3>
+                    <div class="bg-slate-900 p-3 rounded text-sm text-slate-400">
+                        You are a friendly and engaging chatbot. Keep sentences very short and concise.
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-sm font-medium text-slate-300 mb-2">Active Mandate (State)</h3>
+                    <div id="inspector-mandate" class="bg-slate-900 p-3 rounded text-sm text-slate-400">
+                        Loading...
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-sm font-medium text-slate-300 mb-2">Resulting Message</h3>
+                    <div id="inspector-message" class="bg-slate-900 p-3 rounded text-sm text-slate-400">
+                        Loading...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/chat.js"></script>
+</body>
+</html>

@@ -1,0 +1,41 @@
+blocks:
+  - name: "personal_info"
+    description: "Extract basic personal information"
+    turns_threshold: 3
+    fields:
+      - name: "name"
+        question: "What is your name?"
+
+      - name: "age"
+        question: "How old are you?"
+
+        validation: "is_integer and 0 < value < 90"
+
+      - name: "origin"
+        question: "Where are you from?"
+
+
+  - name: "preferences"
+    description: "Extract user preferences and interests"
+    turns_threshold: 4
+    fields:
+      - name: "favorite_color"
+        question: "What is your favorite color?"
+
+      - name: "hobby"
+        question: "What is your favorite hobby?"
+
+      - name: "music_genre"
+        question: "What music genre do you prefer?"
+
+
+  - name: "goals"
+    description: "Extract user goals and aspirations"
+    turns_threshold: 3
+    fields:
+      - name: "short_term_goal"
+        question: "What is a short-term goal you have?"
+  
+      - name: "long_term_goal"
+        question: "What is a long-term goal you have?"
+
