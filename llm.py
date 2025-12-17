@@ -1,40 +1,43 @@
 from google import genai
-from schema import ExtractionResponse, ConversationResponse
-from typing import Union
+from schema import SimpleResponse
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+def get_gemini_client(api_key=None):
+    """Create and return Gemini client"""
+    key = api_key or os.getenv("GEMINI_API_KEY")
+    if not key:
+        raise ValueError("GEMINI_API_KEY not found in environment variables")
+    return genai.Client(api_key=key)
 
 def talk_to_gemini(prompt: str, api_key: str = None) -> str:
-    """Send a prompt to Gemini and get a response"""
+    """Send a prompt to Gemini and get a text response"""
+    client = get_gemini_client(api_key)
 
-    # Create Gemini client
-    client = genai.Client(api_key=api_key)
-
-
-    # Send prompt and get response
     response = client.models.generate_content(
-        model="gemini-2.5-flash-lite",
+        model="gemini-2.0-flash-exp",
         contents=prompt,
     )
 
-    # Return the text response
     return response.text
 
-def talk_to_gemini_structured(prompt: str, api_key: str = None, response_schema: Union[type[ExtractionResponse], type[ConversationResponse]] = ExtractionResponse) -> Union[ExtractionResponse, ConversationResponse]:
+def talk_to_gemini_structured(prompt: str, api_key: str = None, response_schema=SimpleResponse) -> SimpleResponse:
     """Send a prompt to Gemini and get a structured response"""
     import json
 
+    client = get_gemini_client(api_key)
 
-    # Create Gemini client
-    client = genai.Client(api_key=api_key)
-
-    # Configure the model
+    # Configure the model for JSON output
     config = {
         "response_mime_type": "application/json",
         "response_json_schema": response_schema.model_json_schema(),
     }
 
-    # Send prompt and get response
     response = client.models.generate_content(
-        model="gemini-2.5-flash-lite",
+        model="gemini-2.0-flash-exp",
         contents=prompt,
         config=config,
     )
