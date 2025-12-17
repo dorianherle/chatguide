@@ -63,3 +63,4 @@ The app will open in your browser at `http://localhost:8501`
 - Director's log shows internal decision-making
 - Live state updates demonstrate data extraction progress
 - Progress bar visualizes the audit cycle timing
+

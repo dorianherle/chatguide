@@ -1,5 +1,6 @@
 from google import genai
-from schema import ExtractionResponse
+from schema import ExtractionResponse, ConversationResponse
+from typing import Union
 
 def talk_to_gemini(prompt: str, api_key: str = None) -> str:
     """Send a prompt to Gemini and get a response"""
@@ -17,10 +18,10 @@ def talk_to_gemini(prompt: str, api_key: str = None) -> str:
     # Return the text response
     return response.text
 
-def talk_to_gemini_structured(prompt: str, api_key: str = None) -> ExtractionResponse:
+def talk_to_gemini_structured(prompt: str, api_key: str = None, response_schema: Union[type[ExtractionResponse], type[ConversationResponse]] = ExtractionResponse) -> Union[ExtractionResponse, ConversationResponse]:
     """Send a prompt to Gemini and get a structured response"""
     import json
-  
+
 
     # Create Gemini client
     client = genai.Client(api_key=api_key)
@@ -28,7 +29,7 @@ def talk_to_gemini_structured(prompt: str, api_key: str = None) -> ExtractionRes
     # Configure the model
     config = {
         "response_mime_type": "application/json",
-        "response_json_schema": ExtractionResponse.model_json_schema(),
+        "response_json_schema": response_schema.model_json_schema(),
     }
 
     # Send prompt and get response
@@ -40,4 +41,4 @@ def talk_to_gemini_structured(prompt: str, api_key: str = None) -> ExtractionRes
 
     # Parse and validate the JSON response
     response_data = json.loads(response.text)
-    return ExtractionResponse(**response_data)
+    return response_schema(**response_data)

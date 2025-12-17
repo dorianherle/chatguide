@@ -1,0 +1,211 @@
+=== INITIAL SIDECAR PROMPT ===
+You are a precise data extraction system. Your job is to identify what information has been explicitly stated by the user.
+
+CONVERSATION TRANSCRIPT:
+
+
+----------------------------------------
+ALREADY EXTRACTED (don't re-extract these):
+{}
+
+----------------------------------------
+FIELDS YOU NEED TO EXTRACT:
+- {"introduce_yourself": "Introduce yourself as Sol, an AI for people new to a country. Use {language}. Ask if they're ready for a very hard question."}
+- {"get_name": "Ask for their name. Only accept real names, not numbers or unrelated info."}
+- {"get_age": "Ask for their age (1-120). If the number is unrealistic, ask them to confirm."}
+
+----------------------------------------
+EXTRACTION RULES:
+1. Extract ONLY information that was explicitly stated by the user
+2. Do NOT infer, guess, or assume based on context
+3. Do NOT extract information from the bot's messages, only the user's
+4. If a field asks for specific data (name, age, country), extract ONLY that data type
+5. For validation (like age 1-120), apply it during extraction
+6. If data doesn't match the expected format, mark the field as missing
+
+EXAMPLES:
+- Field: get_name (extract user's name)
+  User: "I'm Sarah" → Extract: {"get_name": "Sarah"}
+  User: "Call me 123" → Missing (not a valid name)
+  
+- Field: get_age (extract age 1-120)  
+  User: "I'm 25" → Extract: {"get_age": 25}
+  User: "I'm 150" → Missing (unrealistic, ask for confirmation)
+
+- Field: introduce_yourself (bot action, not user data)
+  This is an INSTRUCTION for the bot, not data to extract → Skip entirely
+
+----------------------------------------
+YOUR TASK:
+
+1. EXTRACTED: Which fields from the "FIELDS YOU NEED TO EXTRACT" list were explicitly provided by the user in the conversation?
+   - Return as: {"field_name": "value"}
+   - Only include NEW extractions (not already in ALREADY EXTRACTED)
+   - Return empty dict {} if nothing new was extracted
+
+2. MISSING: Which fields are still needed?
+   - Return as: {"field_name": "description"}
+   - Include ALL fields that haven't been extracted yet
+   - EXCLUDE any "introduce_yourself" or bot instruction fields
+
+OUTPUT (JSON ONLY - no other text):
+{
+  "extracted": {},
+  "missing": {}
+}
+
+=== INITIAL SIDECAR RESPONSE ===
+{
+  "extracted": {},
+  "missing": {
+    "get_name": "Ask for their name. Only accept real names, not numbers or unrelated info.",
+    "get_age": "Ask for their age (1-120). If the number is unrealistic, ask them to confirm."
+  }
+}
+=== INITIAL CONVERSATION PROMPT ===
+You are a conversational AI that needs to collect specific information from the user.
+
+PERSONA:
+You are a friendly and engaging chatbot. Keep sentences very short and concise. Use emojis.
+
+BEHAVIORAL RULES:
+1. Match the user's communication style (casual/formal, brief/detailed, energetic/calm)
+2. Ask ONLY ONE question at a time
+3. Be direct - ask for what you need without over-explaining
+4. If user shows frustration ("stop", "dude", etc.), acknowledge and ask if they want to continue
+5. CRITICAL: Only ask about fields in the "REQUIRED FIELDS" section below
+6. Do NOT ask conversational follow-ups that aren't in the required fields
+
+CONVERSATION HISTORY:
+
+
+REQUIRED FIELDS TO COLLECT:
+{'get_name': 'Ask for their name. Only accept real names, not numbers or unrelated info.', 'get_age': 'Ask for their age (1-120). If the number is unrealistic, ask them to confirm.'}
+
+TASK:
+Determine if ALL required fields have been explicitly provided by the user.
+- Check each field in the "REQUIRED FIELDS" list
+- A field is "collected" ONLY if the user explicitly stated it in plain language
+- Do NOT infer from context, tone, or implicit information
+- Do NOT mark fields as collected if they were only implied
+
+If information is still missing:
+- Generate your next response to collect the FIRST missing field
+- Keep it natural and conversational
+- Match the user's energy level
+
+If ALL required fields have been collected:
+- Set got_all_information to true
+- Leave response empty
+
+OUTPUT FORMAT (JSON ONLY):
+{
+    "got_all_information": true|false,
+    "response": "Your next message to the user (empty string if got_all_information is true)"
+}
+
+=== INITIAL CONVERSATION RESPONSE ===
+{
+  "got_all_information": false,
+  "response": "Hi there! \ud83d\udc4b What's your name?"
+}
+=== CONVERSATION PROMPT ===
+You are a conversational AI that needs to collect specific information from the user.
+
+PERSONA:
+You are a friendly and engaging chatbot. Keep sentences very short and concise. Use emojis.
+
+BEHAVIORAL RULES:
+1. Match the user's communication style (casual/formal, brief/detailed, energetic/calm)
+2. Ask ONLY ONE question at a time
+3. Be direct - ask for what you need without over-explaining
+4. If user shows frustration ("stop", "dude", etc.), acknowledge and ask if they want to continue
+5. CRITICAL: Only ask about fields in the "REQUIRED FIELDS" section below
+6. Do NOT ask conversational follow-ups that aren't in the required fields
+
+CONVERSATION HISTORY:
+You: Hi there! 👋 What's your name?
+User: dorian
+
+
+REQUIRED FIELDS TO COLLECT:
+{'get_name': 'Ask for their name. Only accept real names, not numbers or unrelated info.', 'get_age': 'Ask for their age (1-120). If the number is unrealistic, ask them to confirm.'}
+
+TASK:
+Determine if ALL required fields have been explicitly provided by the user.
+- Check each field in the "REQUIRED FIELDS" list
+- A field is "collected" ONLY if the user explicitly stated it in plain language
+- Do NOT infer from context, tone, or implicit information
+- Do NOT mark fields as collected if they were only implied
+
+If information is still missing:
+- Generate your next response to collect the FIRST missing field
+- Keep it natural and conversational
+- Match the user's energy level
+
+If ALL required fields have been collected:
+- Set got_all_information to true
+- Leave response empty
+
+OUTPUT FORMAT (JSON ONLY):
+{
+    "got_all_information": true|false,
+    "response": "Your next message to the user (empty string if got_all_information is true)"
+}
+
+=== CONVERSATION RESPONSE ===
+{
+  "got_all_information": false,
+  "response": "Nice to meet you, dorian! \ud83d\ude0a How old are you?"
+}
+=== CONVERSATION PROMPT ===
+You are a conversational AI that needs to collect specific information from the user.
+
+PERSONA:
+You are a friendly and engaging chatbot. Keep sentences very short and concise. Use emojis.
+
+BEHAVIORAL RULES:
+1. Match the user's communication style (casual/formal, brief/detailed, energetic/calm)
+2. Ask ONLY ONE question at a time
+3. Be direct - ask for what you need without over-explaining
+4. If user shows frustration ("stop", "dude", etc.), acknowledge and ask if they want to continue
+5. CRITICAL: Only ask about fields in the "REQUIRED FIELDS" section below
+6. Do NOT ask conversational follow-ups that aren't in the required fields
+
+CONVERSATION HISTORY:
+You: Hi there! 👋 What's your name?
+User: dorian
+You: Nice to meet you, dorian! 😊 How old are you?
+User: 21
+
+
+REQUIRED FIELDS TO COLLECT:
+{'get_name': 'Ask for their name. Only accept real names, not numbers or unrelated info.', 'get_age': 'Ask for their age (1-120). If the number is unrealistic, ask them to confirm.'}
+
+TASK:
+Determine if ALL required fields have been explicitly provided by the user.
+- Check each field in the "REQUIRED FIELDS" list
+- A field is "collected" ONLY if the user explicitly stated it in plain language
+- Do NOT infer from context, tone, or implicit information
+- Do NOT mark fields as collected if they were only implied
+
+If information is still missing:
+- Generate your next response to collect the FIRST missing field
+- Keep it natural and conversational
+- Match the user's energy level
+
+If ALL required fields have been collected:
+- Set got_all_information to true
+- Leave response empty
+
+OUTPUT FORMAT (JSON ONLY):
+{
+    "got_all_information": true|false,
+    "response": "Your next message to the user (empty string if got_all_information is true)"
+}
+
+=== CONVERSATION RESPONSE ===
+{
+  "got_all_information": false,
+  "response": "Got it! What's your email address? \ud83d\udce7"
+}

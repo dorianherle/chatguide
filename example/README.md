@@ -62,3 +62,4 @@ python app.py
 - `audit_start`: Director analysis beginning
 - `audit_end`: Director analysis complete
 - `director_update`: Director state changes
+

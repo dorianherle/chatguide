@@ -106,3 +106,4 @@ $env:GEMINI_API_KEY = "your-api-key-here"
 ├── test_*.py             # Test files
 └── main.py               # Example usage
 ```
+

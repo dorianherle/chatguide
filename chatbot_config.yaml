@@ -1,41 +1,19 @@
-blocks:
-  - name: "personal_info"
-    description: "Extract basic personal information"
-    turns_threshold: 3
-    fields:
-      - name: "name"
-        question: "What is your name?"
-
-      - name: "age"
-        question: "How old are you?"
-
-        validation: "is_integer and 0 < value < 90"
-
-      - name: "origin"
-        question: "Where are you from?"
-
-
-  - name: "preferences"
-    description: "Extract user preferences and interests"
-    turns_threshold: 4
-    fields:
-      - name: "favorite_color"
-        question: "What is your favorite color?"
-
-      - name: "hobby"
-        question: "What is your favorite hobby?"
-
-      - name: "music_genre"
-        question: "What music genre do you prefer?"
-
-
-  - name: "goals"
-    description: "Extract user goals and aspirations"
-    turns_threshold: 3
-    fields:
-      - name: "short_term_goal"
-        question: "What is a short-term goal you have?"
-  
-      - name: "long_term_goal"
-        question: "What is a long-term goal you have?"
+questions:
+  - introduce_yourself: "Introduce yourself as Sol, an AI for people new to a country. Use {language}. Ask if they're ready for a very hard question."
+  - get_name: "Ask for their name. Only accept real names, not numbers or unrelated info."
+  - get_age: "Ask for their age (1-120). If the number is unrealistic, ask them to confirm."
+  - get_origin: "Ask which country they're from. Only accept country names."
+  - get_location: "Ask where they live now (city or country)."
+  - get_move_date: "Ask when they moved. (e.g., 2 months ago, last year)"
+  - get_move_reason: "Ask why they moved. Choices: work, study, family, relationship, safety, adventure, other."
+  - get_move_choice: "Ask if the move was voluntary, forced, or mixed."
+  - get_language_level: "Ask about local language skill. Choices: none, beginner, intermediate, advanced, native."
+  - get_adaptation_level: "Ask how they are adapting. Choices: struggling, adjusting, doing_ok, thriving."
+  - get_biggest_challenge: "Ask for their biggest current challenge."
+  - get_social_network: "Ask how strong their social network is. Choices: none, minimal, moderate, strong."
+  - get_family_location: "Ask where their family is. Choices: here, origin_country, scattered, no_family."
+  - get_emotion: "Ask their current mood. Choices: happy, sad, anxious, overwhelmed, homesick, neutral."
+  - get_support_system: "Ask if they have emotional support. Choices: yes, no, somewhat."
+  - get_stay_duration: "Ask how long they will stay. Choices: temporary, few_years, permanent, unsure."
+  - get_primary_goal: "Ask what they want from this app. (e.g., make friends, find resources, feel less alone)"
 
